@@ -1,0 +1,92 @@
+API Parameters
+Search Query
+geo
+
+Required
+
+Parameter defines the location from where you want the search to originate. It defaults to US (activated when the value of geo parameter is not set or empty). Head to the Google Trends Trending Now Locations for a full list of supported locations.
+
+Advanced Parameters
+hours
+
+Optional
+
+Parameter defines the number of past hours to retrieve the results for. It defaults to 24 (Past 24 hours).
+The predefined value from Google are the following:
+-4 (Past 4 hours)
+-24 (Past 24 hours)
+-48 (Past 48 hours)
+-168 (Past 7 days).
+
+category_id
+
+Optional
+
+Parameter allows results to be filtered by a specific category. E.g. category_id:18 will return only results from the "Technology" category. Head to the Google Trends Trending Now Categories for the full list of supported categories.
+
+only_active
+
+Optional
+
+Parameter filters results to only include those that are currently active.
+
+Localization
+hl
+
+Optional
+
+Parameter defines the language to use for the Google Trends Trending Now search. It's a two-letter language code. (e.g., en for English, es for Spanish, or fr for French). Head to the Google languages page for a full list of supported Google languages.
+
+Serpapi Parameters
+engine
+
+Required
+
+Set parameter to google_trends_trending_now to use the Google Trends Trending Now API engine.
+
+no_cache
+
+Optional
+
+Parameter will force SerpApi to fetch the Google Trends Trending Now results even if a cached version is already present. A cache is served only if the query and all parameters are exactly the same. Cache expires after 1h. Cached searches are free, and are not counted towards your searches per month. It can be set to false (default) to allow results from the cache, or true to disallow results from the cache. no_cache and async parameters should not be used together.
+
+async
+
+Optional
+
+Parameter defines the way you want to submit your search to SerpApi. It can be set to false (default) to open an HTTP connection and keep it open until you got your search results, or true to just submit your search to SerpApi and retrieve them later. In this case, you'll need to use our Searches Archive API to retrieve your results. async and no_cache parameters should not be used together. async should not be used on accounts with Ludicrous Speed enabled.
+
+zero_trace
+
+Optional
+
+Enterprise only. Parameter enables ZeroTrace mode. It can be set to false (default) or true. Enable this mode to skip storing search parameters, search files, and search metadata on our servers. This may make debugging more difficult.
+
+api_key
+
+Required
+
+Parameter defines the SerpApi private key to use.
+
+output
+
+Optional
+
+Parameter defines the final output you want. It can be set to json (default) to get a structured JSON of the results, or html to get the raw html retrieved.
+
+json_restrictor
+
+Optional
+
+Parameter defines the fields you want to restrict in the outputs for smaller, faster responses. See JSON Restrictor for more details.
+
+API Results
+JSON Results
+JSON output includes structured data for suggested searches.
+
+A search status is accessible through search_metadata.status. It flows this way: Processing -> Success || Error. If a search has failed, error will contain an error message. search_metadata.id is the search ID inside SerpApi.
+
+HTML Results
+HTML output is useful to debug JSON results or support features not supported yet by SerpApi. HTML output gives you the raw HTML results from Google Trends.
+This API does not have html response, just a text. search_metadata.prettify_html_file contains prettified version of the result. It is displayed in the playground.
+

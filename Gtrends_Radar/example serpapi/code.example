@@ -1,0 +1,9 @@
+const { getJson } = require("serpapi");
+
+getJson({
+  engine: "google_trends_trending_now",
+  geo: "US",
+  api_key: "03a2294a30eedd29273e9d66511f88bd44b03b2ecfa8856e5f5cab0681d613fa"
+}, (json) => {
+  console.log(json["trending_searches"]);
+});
