@@ -185,7 +185,29 @@ function runTickOnce(cfg, sheetCtx, tz) {
 
         // Mark dedup only after successful upsert for this file
         if (allOk) {
-          markDedupKey(dkey);
+          try {
+            // Prefer sheet-based dedup: append immediately per-file to minimize window
+            var ds = findOrCreateSpreadsheet('QdrantFeedLogs').getSheetByName('awesome_dedup');
+            if (!ds) {
+              try { ds = findOrCreateSpreadsheet('QdrantFeedLogs').insertSheet('awesome_dedup'); ds.appendRow(['dedup_key','ts']); } catch (e) { ds = null; }
+            }
+            if (ds) {
+              try {
+                var ts = Utilities.formatDate(new Date(), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
+                ds.appendRow([dkey, ts]);
+                // keep in-memory cache in sync if present
+                try { if (typeof DEDUP_CACHE !== 'undefined' && DEDUP_CACHE !== null) DEDUP_CACHE[String(dkey)] = true; } catch (eCache) {}
+              } catch (eAppend) {
+                // If sheet append fails, log to logs for observability but do NOT write to PropertiesService (avoid property limits)
+                try { appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'dedup-append-failed', 0)]); } catch (ee) {}
+              }
+            } else {
+              // Sheet not available: log and skip dedup write (do not use PropertiesService)
+              try { appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'dedup-sheet-missing', 0)]); } catch (ee2) {}
+            }
+          } catch (eOverall) {
+            // best-effort only; do not fail processing if dedup logging fails
+          }
         }
       }
 
@@ -253,8 +275,10 @@ function ensureSheet() {
   var sheetName = 'logs';
   var ss = findOrCreateSpreadsheet(name);
   var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) sheet = ss.insertSheet(sheetName);
-  // Ensure header
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+  }
+  // Ensure header (simple, deterministic header creation)
   if (sheet.getLastRow() === 0) {
     sheet.appendRow([
       'timestamp',
@@ -266,7 +290,9 @@ function ensureSheet() {
       'qdrant_http_status',
       'qdrant_result_points_upserted',
       'error_message',
-      'elapsed_ms'
+      'elapsed_ms',
+      'dedup_key',
+      'dedup_ts'
     ]);
   }
   return { spreadsheet: ss, sheet: sheet };
@@ -284,7 +310,25 @@ function findOrCreateSpreadsheet(name) {
 function appendLog(sheet, rows) {
   if (!rows || rows.length === 0) return;
   var startRow = sheet.getLastRow() + 1;
-  var range = sheet.getRange(startRow, 1, rows.length, 10);
+  // Determine number of columns from the first row provided so appendLog supports variable-width rows.
+  var cols = 10;
+  try {
+    if (rows[0] && Array.isArray(rows[0]) && rows[0].length > 0) {
+      cols = rows[0].length;
+    }
+  } catch (e) {
+    cols = 10;
+  }
+  // Ensure there's enough columns in the sheet to accept the data (best-effort)
+  try {
+    var currentCols = sheet.getLastColumn();
+    if (currentCols < cols) {
+      sheet.insertColumnsAfter(currentCols, cols - currentCols);
+    }
+  } catch (e) {
+    // ignore; we'll still attempt to write and let the platform raise if it fails
+  }
+  var range = sheet.getRange(startRow, 1, rows.length, cols);
   range.setValues(rows);
 }
 
@@ -293,6 +337,47 @@ function formatIsoLocal(d, tz) {
 }
 
 function pickRepos(maxCount) {
+  // Enhanced pickRepos: optionally use awesome-list discovery when enabled.
+  // If discovery via awesome lists fails or is disabled, fallback to the original GitHub Search logic.
+  maxCount = (typeof maxCount === 'number' && maxCount > 0) ? maxCount : 10;
+
+  // Check runtime flag: USE_AWESOME_DISCOVERY in Script Properties (true/1/yes)
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var useAwesomeRaw = props.getProperty('USE_AWESOME_DISCOVERY');
+    var useAwesome = false;
+    if (useAwesomeRaw !== null && useAwesomeRaw !== undefined && useAwesomeRaw !== '') {
+      var s = String(useAwesomeRaw).toLowerCase();
+      if (s === 'true' || s === '1' || s === 'yes') useAwesome = true;
+    }
+    if (useAwesome && typeof discoverReposFromAwesomeLists === 'function') {
+      try {
+        var discovered = discoverReposFromAwesomeLists(maxCount);
+        if (discovered && discovered.length > 0) {
+          // Log discovery usage
+          try {
+            var sheetCtx = ensureSheet();
+            var tz = Session && typeof Session.getScriptTimeZone === 'function' ? Session.getScriptTimeZone() : 'UTC';
+            appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', '', discovered.length, 'pickRepos: used awesome discovery ' + discovered.map(function(x){ return x.fullName; }).join(','), 0)]);
+          } catch (e) {
+            // ignore logging errors
+          }
+          return discovered.slice(0, maxCount);
+        }
+      } catch (e) {
+        // If awesome discovery fails, fallthrough to search; record a best-effort log
+        try {
+          var sheetCtx2 = ensureSheet();
+          var tz2 = Session && typeof Session.getScriptTimeZone === 'function' ? Session.getScriptTimeZone() : 'UTC';
+          appendLog(sheetCtx2.sheet, [makeLogRow(tz2, '', '', 0, -1, -1, '', null, 0, 'awesome discovery failed: ' + String(e), 0)]);
+        } catch (e2) {}
+      }
+    }
+  } catch (e) {
+    // ignore property read errors and continue to search-based discovery
+  }
+
+  // --- Original GitHub search-based logic (fallback) ---
   var cfg = getConfig();
   var cursorPage = getCursorPage();
 
@@ -344,28 +429,9 @@ function pickRepos(maxCount) {
     items = res.items;
   }
 
-  // Curated fallback list if GitHub search gives no items
-  if (items.length === 0) {
-    var curated = [
-      { owner: 'facebook', name: 'react' },    // JS
-      { owner: 'django', name: 'django' },     // Python
-      { owner: 'golang', name: 'go' },         // Go
-      { owner: 'pallets', name: 'flask' },     // Python
-      { owner: 'axios', name: 'axios' },       // JS
-      { owner: 'numpy', name: 'numpy' }        // Python
-    ];
-    var reposCur = [];
-    for (var i = 0; i < curated.length && reposCur.length < maxCount; i++) {
-      var it = curated[i];
-      reposCur.push({
-        owner: it.owner,
-        name: it.name,
-        stars: 0,
-        fullName: it.owner + '/' + it.name
-      });
-    }
-    return reposCur;
-  }
+
+    // Logic for curated fallback list (items.length === 0) has been removed.
+    // We now rely solely on awesome-list discovery via USE_AWESOME_DISCOVERY = true.
 
   var repos = [];
   for (var i = 0; i < items.length && repos.length < maxCount; i++) {
@@ -736,14 +802,125 @@ function dedupKey(repoFullName, path, blobSha) {
   return repoFullName + '@' + blobSha + ':' + path;
 }
 
+/* ---------- Dedup helpers (sheet-based consolidated) ---------- */
+/*
+  Consolidated dedup approach (Option A):
+  - Use sheet 'awesome_dedup' as single source-of-truth.
+  - Maintain an in-memory cache `DEDUP_CACHE` per execution to avoid repeated sheet reads.
+  - Provide a migration helper to move legacy `PropertiesService` DEDUP_ keys into the sheet.
+*/
+
+var DEDUP_CACHE = null;
+
+function loadDedupCache() {
+  if (DEDUP_CACHE !== null) return DEDUP_CACHE;
+  DEDUP_CACHE = {};
+  try {
+    var ss = findOrCreateSpreadsheet('QdrantFeedLogs');
+    var sheet = ss.getSheetByName('awesome_dedup');
+    if (!sheet) return DEDUP_CACHE;
+    var last = sheet.getLastRow();
+    if (last < 2) return DEDUP_CACHE;
+    var vals = sheet.getRange(2, 1, last - 1, 1).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      var k = vals[i][0];
+      if (k) DEDUP_CACHE[String(k)] = true;
+    }
+  } catch (e) {
+    // best-effort: leave cache empty on error
+  }
+  return DEDUP_CACHE;
+}
+
 function hasDedupKey(key) {
-  var props = PropertiesService.getScriptProperties();
-  return !!props.getProperty('DEDUP_' + key);
+  if (!key) return false;
+  try {
+    var cache = loadDedupCache();
+    if (cache[String(key)]) return true;
+  } catch (e) {
+    // ignore cache errors
+  }
+  // No fallback to PropertiesService: rely solely on sheet-based dedup (avoid PropertiesService usage and limits).
+  return false;
 }
 
 function markDedupKey(key) {
-  var props = PropertiesService.getScriptProperties();
-  props.setProperty('DEDUP_' + key, '1');
+  if (!key) return;
+  // Append immediately to sheet (per-file) to minimize race window.
+  try {
+    var ss = findOrCreateSpreadsheet('QdrantFeedLogs');
+    var sheet = ss.getSheetByName('awesome_dedup');
+    if (!sheet) {
+      try { sheet = ss.insertSheet('awesome_dedup'); sheet.appendRow(['dedup_key','ts']); } catch (e) { sheet = null; }
+    }
+    if (sheet) {
+      var ts = Utilities.formatDate(new Date(), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
+      sheet.appendRow([key, ts]);
+      if (DEDUP_CACHE === null) DEDUP_CACHE = {};
+      DEDUP_CACHE[String(key)] = true;
+      return;
+    }
+  } catch (e) {
+    // append failed; fall through to properties fallback
+  }
+
+  // Do NOT write dedup keys into PropertiesService (limited storage). Ensure in-memory cache is updated so
+  // within this execution we avoid reprocessing the same key even if sheet append failed.
+  if (DEDUP_CACHE === null) DEDUP_CACHE = {};
+  DEDUP_CACHE[String(key)] = true;
+}
+
+/**
+ * migrateDedupPropertiesToSheet()
+ * Migration helper: moves any DEDUP_ keys in PropertiesService into the awesome_dedup sheet.
+ * Idempotent: safe to run multiple times.
+ *
+ * Returns the number of migrated keys (integer).
+ */
+function migrateDedupPropertiesToSheet() {
+  var migrated = 0;
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var all = props.getProperties() || {};
+    var rows = [];
+    for (var k in all) {
+      if (k && k.indexOf('DEDUP_') === 0) {
+        var ded = k.substring(5); // after 'DEDUP'
+        // Normalize: if leading '_' present (legacy), strip
+        if (ded.charAt(0) === '_') ded = ded.substring(1);
+        var keyVal = ded;
+        var ts = Utilities.formatDate(new Date(), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
+        rows.push([keyVal, ts]);
+        migrated++;
+        try { props.deleteProperty(k); } catch (eDel) {}
+      }
+    }
+    if (rows.length > 0) {
+      var ss = findOrCreateSpreadsheet('QdrantFeedLogs');
+      var sheet = ss.getSheetByName('awesome_dedup');
+      if (!sheet) {
+        try { sheet = ss.insertSheet('awesome_dedup'); sheet.appendRow(['dedup_key','ts']); } catch (e2) { sheet = null; }
+      }
+      if (sheet) {
+        try {
+          sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 2).setValues(rows);
+        } catch (eSet) {
+          // fallback to appendRow loop
+          for (var ri = 0; ri < rows.length; ri++) {
+            try { sheet.appendRow(rows[ri]); } catch (eRow) {}
+          }
+        }
+      }
+    }
+  } catch (eOuter) {
+    // best-effort only
+  }
+  // Refresh cache
+  DEDUP_CACHE = null;
+  loadDedupCache();
+  // Log migration result for observability (best-effort)
+  try { appendLogIfAvailable('migrate-dedup', 'migrated=' + String(migrated)); } catch (e) {}
+  return migrated;
 }
 
 function getCursorPage() {

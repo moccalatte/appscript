@@ -1,0 +1,544 @@
+
+<!doctype html>
+<html lang="id" class="h-full" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JobSeer GAS – Prototype UI (Tailwind + shadcn)</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: "#2563eb",
+                foreground: "#f8fafc",
+              },
+              accent: {
+                DEFAULT: "#22d3ee",
+                foreground: "#0f172a",
+              },
+              muted: {
+                DEFAULT: "#f1f5f9",
+                foreground: "#475569",
+              },
+              background: "#f8fafc",
+              foreground: "#0f172a",
+            },
+            boxShadow: {
+              soft: "0 20px 45px -20px rgba(15, 23, 42, 0.25)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .toast-enter {
+        animation: toast-in 0.25s ease-out;
+      }
+      @keyframes toast-in {
+        from {
+          opacity: 0;
+          transform: translateY(-8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body class="h-full bg-background font-sans text-foreground antialiased transition-colors duration-300">
+    <div class="toast fixed right-5 top-5 z-50 flex w-full max-w-sm flex-col gap-2"></div>
+
+    <div class="flex min-h-screen flex-col bg-background dark:bg-slate-950">
+      <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
+        <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
+          <div>
+            <div class="flex items-center gap-2 text-sm uppercase tracking-[0.4em] text-primary/80 dark:text-accent">
+              <span>JobSeer</span>
+              <span class="h-1 w-8 rounded-full bg-primary/40 dark:bg-accent/60"></span>
+            </div>
+            <h1 class="mt-1 text-3xl font-semibold text-slate-900 dark:text-slate-100">Dashboard Automasi Lamaran</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              Prototype interaktif dengan Tailwind + shadcn UI.
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button
+              id="themeToggle"
+              class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-soft transition hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
+              aria-label="Toggle theme"
+            >
+              <span id="themeIcon">🌙</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="relative flex-1 overflow-hidden">
+        <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -top-24 h-64 bg-gradient-to-r from-primary/25 via-transparent to-accent/25 blur-3xl dark:from-primary/30 dark:via-transparent dark:to-accent/40"></div>
+        <div aria-hidden="true" class="pointer-events-none absolute -left-40 bottom-0 h-72 w-72 rounded-full bg-gradient-to-br from-accent/30 to-primary/30 blur-3xl dark:from-accent/40 dark:to-primary/50"></div>
+        <div class="relative mx-auto grid w-full max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[260px_1fr]">
+          <aside class="space-y-4">
+            <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+              <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Navigasi</h2>
+              <nav class="mt-4 space-y-2">
+                <button data-tab="submit" class="tab-btn w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                  📥 Submit Lowongan
+                </button>
+                <button data-tab="profile" class="tab-btn w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                  👤 Profil & CV
+                </button>
+                <button data-tab="status" class="tab-btn w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                  📊 Status Pipeline
+                </button>
+              </nav>
+            </div>
+
+            <div class="rounded-3xl border border-primary/20 bg-primary/5 p-5 shadow-soft dark:border-accent/30 dark:bg-slate-900">
+              <p class="text-sm font-semibold text-primary dark:text-accent">Catatan Interaksi</p>
+              <p class="mt-2 text-sm leading-relaxed text-primary/80 dark:text-accent/80">
+                Prototype sepenuhnya interaktif: coba upload dummy, ganti mode, jalankan antrean, dan lihat perubahan status secara real-time.
+              </p>
+            </div>
+          </aside>
+
+          <section id="workspace" class="space-y-6">
+            <!-- TAB: SUBMIT -->
+            <div data-panel="submit" class="tab-panel hidden space-y-6">
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Upload Lowongan</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Pilih mode kerja, unggah screenshot, atau kirim teks raw.</p>
+                  </div>
+                  <div class="flex items-center gap-2 rounded-full border border-slate-200 bg-muted px-4 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    Mode aktif: <span id="activeMode" class="ml-1 text-primary dark:text-accent">Nabung</span>
+                  </div>
+                </div>
+
+                <div class="mt-6 flex flex-wrap gap-3">
+                  <button data-mode="nabung" class="mode-btn inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                    📦 Nabung Lamaran
+                  </button>
+                  <button data-mode="kirim" class="mode-btn inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                    🚀 Kirim Langsung
+                  </button>
+                </div>
+
+                <div class="mt-8 grid gap-6 lg:grid-cols-2">
+                  <form id="formScreenshot" class="rounded-2xl border border-sky-200 bg-gradient-to-br from-white via-sky-50/60 to-white p-5 shadow-soft transition hover:border-sky-300 hover:shadow-xl dark:border-sky-900/60 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:hover:border-sky-600/60">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200">📸 Upload Screenshot</h3>
+                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Seret & lepas beberapa file atau pilih manual. Sistem akan mengantre untuk OCR.</p>
+                    <label class="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-500 transition hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary">
+                      <span id="screenshotInfo">Belum ada file dipilih</span>
+                      <input id="inputScreenshot" type="file" class="hidden" accept="image/*" multiple />
+                    </label>
+                    <button class="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:bg-primary/90">
+                      Unggah ke Antrean
+                    </button>
+                  </form>
+
+                  <form id="formText" class="rounded-2xl border border-rose-200 bg-gradient-to-br from-white via-rose-50/60 to-white p-5 shadow-soft transition hover:border-rose-300 hover:shadow-xl dark:border-rose-900/60 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:hover:border-rose-600/60">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200">📝 Teks Lowongan</h3>
+                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Tempel deskripsi pekerjaan dan parse langsung ke struktur.</p>
+                    <textarea
+                      id="inputText"
+                      rows="6"
+                      class="mt-4 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      placeholder="Tempel deskripsi pekerjaan di sini..."
+                    ></textarea>
+                    <button class="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary">
+                      Parse Sekarang
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Antrean Otomasi</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Kelola proses massal: OCR, parsing, dan pengiriman email.</p>
+
+                <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div class="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-4 shadow-soft dark:border-sky-900/60 dark:from-sky-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Menunggu OCR</div>
+                    <div id="statOcr" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Proses otomatis setiap ±3 menit.</p>
+                  </div>
+                  <div class="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-white p-4 shadow-soft dark:border-violet-900/60 dark:from-violet-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Parsed</div>
+                    <div id="statParsed" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Siap generate cover letter.</p>
+                  </div>
+                  <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-soft dark:border-emerald-900/60 dark:from-emerald-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Nabung</div>
+                    <div id="statNabung" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Menunggu approval sebelum kirim.</p>
+                  </div>
+                  <div class="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white p-4 shadow-soft dark:border-amber-900/60 dark:from-amber-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Terkirim</div>
+                    <div id="statSent" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Email sukses + log tersimpan.</p>
+                  </div>
+                </div>
+
+                <div class="mt-6 flex flex-wrap gap-3">
+                  <button id="btnProcessOcr" class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:bg-primary/90">
+                    🔁 Proses OCR Antrean
+                  </button>
+                  <button id="btnProcessParsing" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary">
+                    🧠 Parsing Otomatis
+                  </button>
+                  <button id="btnSendAll" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600">
+                    📬 Kirim Semua Nabung
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB: PROFILE -->
+            <div data-panel="profile" class="tab-panel hidden space-y-6">
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Profil Kandidat</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Data tersimpan di localStorage untuk simulasi.</p>
+
+                <form id="formProfile" class="mt-6 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Nama Lengkap</label>
+                    <input id="profileName" type="text" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" placeholder="Nama Anda" required />
+                  </div>
+                  <div>
+                    <label class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</label>
+                    <input id="profileEmail" type="email" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" placeholder="email@domain.com" required />
+                  </div>
+                  <div>
+                    <label class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">CV URL</label>
+                    <input id="profileCv" type="url" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" placeholder="https://..." />
+                  </div>
+                  <div>
+                    <label class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Prompt Custom</label>
+                    <input id="profilePrompt" type="text" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" placeholder="Arahan cover letter" />
+                  </div>
+                  <div class="sm:col-span-2">
+                    <button class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:bg-primary/90">
+                      💾 Simpan Profil
+                    </button>
+                  </div>
+                </form>
+
+                <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300" id="profileSummary">
+                  Belum ada profil tersimpan.
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB: STATUS -->
+            <div data-panel="status" class="tab-panel hidden space-y-6">
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Log Aktivitas</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Setiap aksi di simulator akan muncul di sini.</p>
+                  </div>
+                  <button id="btnClearLog" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-red-400 hover:text-red-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-red-500 dark:hover:text-red-400">
+                    🧹 Bersihkan Log
+                  </button>
+                </div>
+                <div id="logContainer" class="mt-6 space-y-3 text-sm"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <footer class="border-t border-slate-200 bg-white/80 py-6 text-center text-sm text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+        © 2025 JobSeer GAS. Prototype UI Tailwind + shadcn. Semua aksi berjalan secara lokal.
+      </footer>
+    </div>
+
+    <script>
+      const root = document.documentElement;
+      const themeToggle = document.getElementById("themeToggle");
+      const themeIcon = document.getElementById("themeIcon");
+      const toastContainer = document.querySelector(".toast");
+      const tabButtons = document.querySelectorAll(".tab-btn");
+      const panels = document.querySelectorAll(".tab-panel");
+      const modeButtons = document.querySelectorAll(".mode-btn");
+      const activeModeLabel = document.getElementById("activeMode");
+      const statOcr = document.getElementById("statOcr");
+      const statParsed = document.getElementById("statParsed");
+      const statNabung = document.getElementById("statNabung");
+      const statSent = document.getElementById("statSent");
+      const logContainer = document.getElementById("logContainer");
+      const screenshotInfo = document.getElementById("screenshotInfo");
+
+      const state = {
+        currentTab: "submit",
+        mode: "nabung",
+        ocrQueue: 3,
+        parsedQueue: 6,
+        nabungCount: 4,
+        sentCount: 12,
+        logs: [],
+      };
+
+      function applyTheme(mode) {
+        if (mode === "dark") {
+          root.classList.add("dark");
+          root.setAttribute("data-theme", "dark");
+          themeIcon.textContent = "☀️";
+        } else {
+          root.classList.remove("dark");
+          root.setAttribute("data-theme", "light");
+          themeIcon.textContent = "🌙";
+        }
+        localStorage.setItem("jobseer-theme", mode);
+      }
+
+      const storedTheme = localStorage.getItem("jobseer-theme");
+      if (storedTheme) {
+        applyTheme(storedTheme);
+      } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        applyTheme("dark");
+      }
+
+      themeToggle.addEventListener("click", () => {
+        const current = root.classList.contains("dark") ? "dark" : "light";
+        applyTheme(current === "dark" ? "light" : "dark");
+      });
+
+      function showToast(message, variant = "default") {
+        const colors = {
+          default: "bg-slate-900/90 text-white",
+          success: "bg-emerald-500 text-white",
+          info: "bg-slate-700 text-white",
+          warning: "bg-amber-500 text-slate-900",
+          danger: "bg-red-500 text-white",
+        };
+        const el = document.createElement("div");
+        el.className = `toast-enter rounded-xl px-4 py-3 text-sm shadow-lg ${colors[variant] || colors.default}`;
+        el.textContent = message;
+        toastContainer.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = "0";
+          el.style.transform = "translateY(-8px)";
+          setTimeout(() => el.remove(), 200);
+        }, 2500);
+      }
+
+      function renderTabs() {
+        tabButtons.forEach((btn) => {
+          const isActive = btn.dataset.tab === state.currentTab;
+          const baseClass = "tab-btn w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2";
+          const activeClass = "bg-gradient-to-r from-primary/15 via-white to-accent/25 text-primary shadow-soft border border-primary/40 dark:from-primary/25 dark:via-slate-900 dark:to-accent/30 dark:text-accent";
+          const inactiveClass = "text-slate-600 border border-transparent hover:bg-muted/60 dark:text-slate-200 dark:hover:bg-slate-800/80";
+          btn.className = `${baseClass} ${isActive ? activeClass : inactiveClass}`;
+        });
+        panels.forEach((panel) => {
+          panel.classList.toggle("hidden", panel.dataset.panel !== state.currentTab);
+        });
+      }
+
+      tabButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.currentTab = btn.dataset.tab;
+          renderTabs();
+        });
+      });
+
+      function renderStats() {
+        statOcr.textContent = state.ocrQueue;
+        statParsed.textContent = state.parsedQueue;
+        statNabung.textContent = state.nabungCount;
+        statSent.textContent = state.sentCount;
+      }
+
+      function renderModeButtons() {
+        modeButtons.forEach((btn) => {
+          const isActive = btn.dataset.mode === state.mode;
+          const base = "mode-btn inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2";
+          const active = "bg-gradient-to-r from-primary/20 via-white to-accent/30 text-primary shadow-soft border border-transparent dark:from-primary/25 dark:via-slate-900 dark:to-accent/40 dark:text-accent";
+          const inactive = "border border-slate-200 bg-white text-slate-600 hover:border-primary/40 hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary/40 dark:hover:text-accent";
+          btn.className = `${base} ${isActive ? active : inactive}`;
+        });
+        activeModeLabel.textContent = state.mode === "nabung" ? "Nabung" : "Kirim";
+      }
+
+      modeButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.mode = btn.dataset.mode;
+          showToast(`Mode diubah ke ${state.mode === "nabung" ? "Nabung" : "Kirim Langsung"}`, "info");
+          renderModeButtons();
+        });
+      });
+
+      document.getElementById("inputScreenshot").addEventListener("change", (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) {
+          screenshotInfo.textContent = "Belum ada file dipilih";
+          return;
+        }
+        screenshotInfo.textContent = `${files.length} file siap diunggah`;
+      });
+
+      document.getElementById("formScreenshot").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const files = Array.from(document.getElementById("inputScreenshot").files || []);
+        if (files.length === 0) {
+          showToast("Pilih minimal satu screenshot dulu.", "warning");
+          return;
+        }
+        state.ocrQueue += files.length;
+        logAction(`Menambahkan ${files.length} screenshot ke antrean OCR (mode ${state.mode}).`);
+        showToast(`Berhasil antrikan ${files.length} screenshot!`, "success");
+        document.getElementById("inputScreenshot").value = "";
+        screenshotInfo.textContent = "Belum ada file dipilih";
+        renderStats();
+      });
+
+      document.getElementById("formText").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const text = document.getElementById("inputText").value.trim();
+        if (!text) {
+          showToast("Isi teks lowongan terlebih dahulu.", "warning");
+          return;
+        }
+        state.parsedQueue += 1;
+        if (state.mode === "nabung") {
+          state.nabungCount += 1;
+        } else {
+          state.sentCount += 1;
+        }
+        logAction(`Input teks diproses (${state.mode}).`);
+        showToast("Teks berhasil diparse!", "success");
+        document.getElementById("inputText").value = "";
+        renderStats();
+      });
+
+      document.getElementById("btnProcessOcr").addEventListener("click", () => {
+        if (state.ocrQueue === 0) {
+          showToast("Tidak ada antrean OCR.", "info");
+          return;
+        }
+        const processed = Math.min(state.ocrQueue, 2);
+        state.ocrQueue -= processed;
+        state.parsedQueue += processed;
+        logAction(`Menjalankan OCR: ${processed} item selesai.`);
+        showToast(`OCR selesai untuk ${processed} item.`, "success");
+        renderStats();
+      });
+
+      document.getElementById("btnProcessParsing").addEventListener("click", () => {
+        if (state.parsedQueue === 0) {
+          showToast("Tidak ada teks untuk diparse.", "info");
+          return;
+        }
+        const processed = Math.min(state.parsedQueue, 3);
+        state.parsedQueue -= processed;
+        state.nabungCount += processed;
+        logAction(`Parsing massal: ${processed} item masuk daftar nabung.`);
+        showToast(`Parsing ${processed} item selesai!`, "success");
+        renderStats();
+      });
+
+      document.getElementById("btnSendAll").addEventListener("click", () => {
+        if (state.nabungCount === 0) {
+          showToast("Tidak ada lamaran nabung.", "info");
+          return;
+        }
+        const processed = Math.min(state.nabungCount, 5);
+        state.nabungCount -= processed;
+        state.sentCount += processed;
+        logAction(`Mengirim ${processed} lamaran nabung.`);
+        showToast(`${processed} lamaran terkirim!`, "success");
+        renderStats();
+      });
+
+      function logAction(text) {
+        const timestamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        state.logs.unshift({ text, timestamp });
+        state.logs = state.logs.slice(0, 20);
+        renderLog();
+      }
+
+      function renderLog() {
+        if (state.logs.length === 0) {
+          logContainer.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">Belum ada aktivitas.</div>';
+          return;
+        }
+        logContainer.innerHTML = state.logs
+          .map(
+            (entry) => `
+              <div class="rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
+                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">${entry.timestamp}</div>
+                <div class="mt-1 text-sm text-slate-700 dark:text-slate-200">${entry.text}</div>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      document.getElementById("btnClearLog").addEventListener("click", () => {
+        state.logs = [];
+        renderLog();
+        showToast("Log dibersihkan.", "info");
+      });
+
+      document.getElementById("formProfile").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const profile = {
+          name: document.getElementById("profileName").value.trim(),
+          email: document.getElementById("profileEmail").value.trim(),
+          cv: document.getElementById("profileCv").value.trim(),
+          prompt: document.getElementById("profilePrompt").value.trim(),
+        };
+        localStorage.setItem("jobseer-profile", JSON.stringify(profile));
+        updateProfileSummary(profile);
+        showToast("Profil tersimpan lokal!", "success");
+      });
+
+      function updateProfileSummary(profile) {
+        const summary = document.getElementById("profileSummary");
+        if (!profile || !profile.name) {
+          summary.textContent = "Belum ada profil tersimpan.";
+          return;
+        }
+        summary.innerHTML = `
+          <p><span class="font-semibold text-slate-700 dark:text-slate-200">Nama:</span> ${profile.name}</p>
+          <p><span class="font-semibold text-slate-700 dark:text-slate-200">Email:</span> ${profile.email || "-"}</p>
+          <p><span class="font-semibold text-slate-700 dark:text-slate-200">CV:</span> ${profile.cv ? `<a href="${profile.cv}" target="_blank" class="text-primary underline dark:text-accent">Link CV</a>` : "Belum di-set"}</p>
+          <p><span class="font-semibold text-slate-700 dark:text-slate-200">Prompt:</span> ${profile.prompt || "(default)"}</p>
+        `;
+      }
+
+      function loadProfile() {
+        const stored = localStorage.getItem("jobseer-profile");
+        if (!stored) return;
+        try {
+          const profile = JSON.parse(stored);
+          document.getElementById("profileName").value = profile.name || "";
+          document.getElementById("profileEmail").value = profile.email || "";
+          document.getElementById("profileCv").value = profile.cv || "";
+          document.getElementById("profilePrompt").value = profile.prompt || "";
+          updateProfileSummary(profile);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      function init() {
+        renderTabs();
+        renderModeButtons();
+        renderStats();
+        renderLog();
+        loadProfile();
+      }
+
+      state.currentTab = "submit";
+      init();
+    </script>
+  </body>
+</html>

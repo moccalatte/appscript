@@ -1,0 +1,847 @@
+
+<!doctype html>
+<html lang="id" class="h-full" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JobSeer GAS · Lamaran Kerja Pintar</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: { DEFAULT: "#2563eb", foreground: "#f8fafc" },
+              accent: { DEFAULT: "#22d3ee", foreground: "#0f172a" },
+              muted: { DEFAULT: "#f1f5f9", foreground: "#475569" },
+              background: "#f8fafc",
+              foreground: "#0f172a",
+            },
+            boxShadow: {
+              soft: "0 20px 45px -20px rgba(15,23,42,.25)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .toast-enter { animation: toast-in 0.25s ease-out; }
+      @keyframes toast-in {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-background font-sans text-foreground antialiased transition-colors duration-300 dark:bg-slate-950">
+    <!-- Toasts -->
+    <div id="toastContainer" class="pointer-events-none fixed right-4 top-4 z-50 flex w-full max-w-sm flex-col gap-2"></div>
+
+    <!-- Spinner Overlay -->
+    <div id="spinnerOverlay" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/60 backdrop-blur">
+      <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-soft dark:border-slate-700 dark:bg-slate-900">
+        <svg class="h-10 w-10 animate-spin text-primary" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        <p id="spinnerText" class="text-sm font-medium text-slate-600 dark:text-slate-300">Memproses...</p>
+      </div>
+    </div>
+
+    <!-- Email Modal -->
+    <div id="emailModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur">
+      <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex items-start justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Email HR tidak valid</h3>
+            <p id="emailReason" class="mt-1 text-sm text-slate-500 dark:text-slate-400"></p>
+          </div>
+          <button class="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" data-modal-close="emailModal">✖️</button>
+        </div>
+        <div class="mt-4 space-y-3">
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Masukkan email HR secara manual</label>
+          <input id="manualEmailInput" type="email" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="hr@company.com" />
+        </div>
+        <div class="mt-6 flex justify-end gap-3">
+          <button class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-200" data-modal-close="emailModal">Batal</button>
+          <button id="confirmEmailBtn" class="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:bg-primary/90">Kirim Ulang</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk Preview Modal -->
+    <div id="bulkModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur">
+      <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex items-start justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Preview Lamaran Nabung</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Pastikan semuanya sudah tepat sebelum dikirim.</p>
+          </div>
+          <button class="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" data-modal-close="bulkModal">✖️</button>
+        </div>
+        <div id="bulkListDiv" class="mt-5 max-h-72 space-y-3 overflow-y-auto pr-2 text-sm text-slate-600 dark:text-slate-200"></div>
+        <div class="mt-6 flex justify-end gap-3">
+          <button class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 dark:border-slate-700 dark:text-slate-200" data-modal-close="bulkModal">Nanti Dulu</button>
+          <button id="confirmBulkSendBtn" class="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:bg-primary/90">Kirim Semua</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex min-h-screen flex-col">
+      <header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
+        <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
+          <div>
+            <div class="flex items-center gap-2 text-xs uppercase tracking-[0.4em] text-primary/80 dark:text-accent/80">
+              <span>JobSeer</span>
+              <span class="h-1 w-8 rounded-full bg-primary/40 dark:bg-accent/50"></span>
+            </div>
+            <h1 class="mt-1 text-3xl font-semibold text-slate-900 dark:text-slate-100">Lamaran Kerja Pintar</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Automasi profesional anti terdeteksi AI.</p>
+          </div>
+          <button id="themeToggle" class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-soft transition hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600" aria-label="Toggle theme">
+            <span id="themeIcon">🌙</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="relative flex-1 overflow-hidden">
+        <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -top-24 h-64 bg-gradient-to-r from-primary/25 via-transparent to-accent/25 blur-3xl dark:from-primary/30 dark:via-transparent dark:to-accent/40"></div>
+        <div aria-hidden="true" class="pointer-events-none absolute -left-40 bottom-0 h-72 w-72 rounded-full bg-gradient-to-br from-accent/30 to-primary/30 blur-3xl dark:from-accent/40 dark:to-primary/50"></div>
+        <div class="relative mx-auto grid w-full max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[260px_1fr]">
+          <aside class="space-y-4">
+            <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+              <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Navigasi</h2>
+              <nav class="mt-4 space-y-2">
+                <button data-tab="submit" class="tab-btn w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                  📥 Submit Lowongan
+                </button>
+                <button data-tab="profile" class="tab-btn w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                  👤 Profil & CV
+                </button>
+                <button data-tab="status" class="tab-btn w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                  📊 Status Pipeline
+                </button>
+              </nav>
+            </div>
+
+            <div class="rounded-3xl border border-primary/20 bg-primary/5 p-5 shadow-soft dark:border-accent/30 dark:bg-slate-900">
+              <p class="text-sm font-semibold text-primary dark:text-accent">Catatan Interaksi</p>
+              <p class="mt-2 text-sm leading-relaxed text-primary/80 dark:text-accent/80">
+                Semua aksi di halaman ini sudah terhubung ke Apps Script: upload, parsing, batch proses, hingga pengiriman email.
+              </p>
+            </div>
+          </aside>
+
+          <section id="workspace" class="space-y-6">
+            <!-- TAB SUBMIT -->
+            <div data-panel="submit" class="tab-panel hidden space-y-6">
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Upload Lowongan</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Pilih mode kerja, unggah screenshot, atau kirim teks raw.</p>
+                  </div>
+                  <div class="flex items-center gap-2 rounded-full border border-slate-200 bg-muted px-4 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    Mode aktif: <span id="activeMode" class="ml-1 text-primary dark:text-accent">Nabung</span>
+                  </div>
+                </div>
+
+                <div class="mt-6 flex flex-wrap gap-3">
+                  <button data-mode="nabung" class="mode-btn inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                    📦 Nabung Lamaran
+                  </button>
+                  <button data-mode="kirim" class="mode-btn inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2">
+                    🚀 Kirim Langsung
+                  </button>
+                </div>
+
+                <div class="mt-8 grid gap-6 lg:grid-cols-2">
+                  <form id="imageForm" class="rounded-2xl border border-sky-200 bg-gradient-to-br from-white via-sky-50/60 to-white p-5 shadow-soft transition hover:border-sky-300 hover:shadow-xl dark:border-sky-900/60 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:hover:border-sky-600/60">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200">📸 Upload Screenshot</h3>
+                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Seret & lepas beberapa file atau pilih manual untuk langsung diproses atau ditabung.</p>
+                    <label class="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-500 transition hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary">
+                      <span id="singleImageLabel">Belum ada file dipilih</span>
+                      <input id="imageInput" type="file" class="hidden" accept="image/*" />
+                    </label>
+                    <button type="submit" class="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:bg-primary/90">
+                      Unggah & Proses
+                    </button>
+                  </form>
+
+                  <form id="textForm" class="rounded-2xl border border-rose-200 bg-gradient-to-br from-white via-rose-50/60 to-white p-5 shadow-soft transition hover:border-rose-300 hover:shadow-xl dark:border-rose-900/60 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:hover:border-rose-600/60">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200">📝 Teks Lowongan</h3>
+                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Tempel deskripsi pekerjaan dan langsung parse ke structured data.</p>
+                    <textarea id="textInput" rows="6" class="mt-4 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" placeholder="Tempel deskripsi pekerjaan di sini..."></textarea>
+                    <button type="submit" class="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary">
+                      Parse Sekarang
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Antrean Otomasi</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Kelola proses massal: OCR, parsing, dan pengiriman email.</p>
+
+                <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div class="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-4 shadow-soft dark:border-sky-900/60 dark:from-sky-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Menunggu OCR</div>
+                    <div id="statOcrQueue" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Batch upload yang belum diekstrak.</p>
+                  </div>
+                  <div class="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-white p-4 shadow-soft dark:border-violet-900/60 dark:from-violet-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Parsed</div>
+                    <div id="statParsedQueue" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Sudah OCR, siap parsing.</p>
+                  </div>
+                  <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-soft dark:border-emerald-900/60 dark:from-emerald-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Nabung</div>
+                    <div id="statNabung" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Siap review atau kirim massal.</p>
+                  </div>
+                  <div class="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white p-4 shadow-soft dark:border-amber-900/60 dark:from-amber-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Terkirim</div>
+                    <div id="statSent" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Email sukses ke HR.</p>
+                  </div>
+                </div>
+
+                <div class="mt-6 grid gap-4 lg:grid-cols-2">
+                  <form id="batchImageForm" class="rounded-2xl border border-slate-200 bg-muted/40 p-5 shadow-soft transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/40">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200">🗂️ Upload Batch Screenshot</h3>
+                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Pilih banyak gambar, simpan ke Google Drive, dan antrekan OCR otomatis.</p>
+                    <label class="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-500 transition hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary">
+                      <span id="batchImageLabel">Belum ada file dipilih</span>
+                      <input id="batchImageInput" type="file" class="hidden" accept="image/*" multiple />
+                    </label>
+                    <button type="submit" class="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground shadow-soft transition hover:bg-accent/90">
+                      Unggah ke Antrean OCR
+                    </button>
+                  </form>
+                  <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200">⚙️ Aksi Massal</h3>
+                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Trigger manual jika ingin mempercepat proses.</p>
+                    <div class="mt-4 flex flex-col gap-3">
+                      <button id="runOcrQueueBtn" class="inline-flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary">
+                        🔁 Proses Gambar Antrean
+                      </button>
+                      <button id="runParseQueueBtn" class="inline-flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary">
+                        🧠 Parsing Lowongan Pending
+                      </button>
+                      <button id="sendBulkBtn" class="inline-flex items-center justify-between rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:bg-primary/90">
+                        📬 Kirim Semua Nabung
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB PROFILE -->
+            <div data-panel="profile" class="tab-panel hidden space-y-6">
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Profil Kandidat</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Data tersimpan lokal untuk mempermudah generasi cover letter.</p>
+
+                <form id="profileForm" class="mt-6 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Nama Lengkap</label>
+                    <input id="profileName" type="text" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="Nama Anda" required />
+                  </div>
+                  <div>
+                    <label class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</label>
+                    <input id="profileEmail" type="email" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="email@domain.com" required />
+                  </div>
+                  <div>
+                    <label class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">CV URL</label>
+                    <input id="profileCvUrl" type="url" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="https://drive.google.com/..." />
+                  </div>
+                  <div>
+                    <label class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Prompt Custom</label>
+                    <input id="profilePrompt" type="text" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="Arahan khusus cover letter" />
+                  </div>
+                  <div class="sm:col-span-2">
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:bg-primary/90">
+                      💾 Simpan Profil
+                    </button>
+                  </div>
+                </form>
+
+                <div id="profileInfo" class="mt-6 rounded-2xl border border-slate-200 bg-muted/40 p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
+                  Belum ada profil tersimpan.
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB STATUS -->
+            <div data-panel="status" class="tab-panel hidden space-y-6">
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Riwayat Pengiriman</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Pantau status terkini lamaran yang dikirim.</p>
+                  </div>
+                  <button id="refreshStatusBtn" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary">
+                    🔄 Refresh Data
+                  </button>
+                </div>
+                <div id="statusHistory" class="mt-6 max-h-80 space-y-3 overflow-y-auto pr-2 text-sm text-slate-600 dark:text-slate-200">
+                  <div class="rounded-2xl border border-dashed border-slate-300 bg-muted/40 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                    Belum ada riwayat pengiriman.
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Status Tambahan</h2>
+                <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div class="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white p-4 shadow-soft dark:border-rose-900/60 dark:from-rose-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Duplikat</div>
+                    <div id="statDuplicate" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                  </div>
+                  <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-white p-4 shadow-soft dark:border-slate-700 dark:from-slate-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Gagal</div>
+                    <div id="statFailed" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                  </div>
+                  <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-primary/10 via-white to-white p-4 shadow-soft dark:border-slate-700 dark:from-primary/20 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Manual Email</div>
+                    <div id="statNeedEmail" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                  </div>
+                  <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-soft dark:border-emerald-900/60 dark:from-emerald-900/40 dark:via-slate-900 dark:to-slate-950">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Total Lamaran</div>
+                    <div id="statTotal" class="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">0</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <footer class="border-t border-slate-200 bg-white/80 py-6 text-center text-sm text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+        © 2025 JobSeer GAS. Automasi lamaran profesional anti terdeteksi AI.
+      </footer>
+    </div>
+
+    <script>
+      const root = document.documentElement;
+      const themeToggle = document.getElementById('themeToggle');
+      const themeIcon = document.getElementById('themeIcon');
+      const toastContainer = document.getElementById('toastContainer');
+      const spinnerOverlay = document.getElementById('spinnerOverlay');
+      const spinnerText = document.getElementById('spinnerText');
+      const tabButtons = document.querySelectorAll('[data-tab]');
+      const panels = document.querySelectorAll('[data-panel]');
+      const modeButtons = document.querySelectorAll('.mode-btn');
+      const activeModeLabel = document.getElementById('activeMode');
+      const singleImageLabel = document.getElementById('singleImageLabel');
+      const batchImageLabel = document.getElementById('batchImageLabel');
+      const statusHistory = document.getElementById('statusHistory');
+
+      let currentTab = 'submit';
+      let currentMode = 'nabung';
+      let currentRetryData = null;
+
+      // ==================== THEME ====================
+      function applyTheme(mode) {
+        if (mode === 'dark') {
+          root.classList.add('dark');
+          root.setAttribute('data-theme', 'dark');
+          themeIcon.textContent = '☀️';
+        } else {
+          root.classList.remove('dark');
+          root.setAttribute('data-theme', 'light');
+          themeIcon.textContent = '🌙';
+        }
+        localStorage.setItem('jobseer-theme', mode);
+      }
+
+      const storedTheme = localStorage.getItem('jobseer-theme');
+      if (storedTheme) {
+        applyTheme(storedTheme);
+      } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        applyTheme('dark');
+      }
+
+      themeToggle.addEventListener('click', () => {
+        const current = root.classList.contains('dark') ? 'dark' : 'light';
+        applyTheme(current === 'dark' ? 'light' : 'dark');
+      });
+
+      // ==================== TOAST ====================
+      function showToast(message, variant = 'default') {
+        const palette = {
+          default: 'bg-slate-900/90 text-white',
+          success: 'bg-emerald-500 text-white',
+          info: 'bg-slate-700 text-white',
+          warning: 'bg-amber-400 text-slate-900',
+          danger: 'bg-red-500 text-white'
+        };
+        const toast = document.createElement('div');
+        toast.className = `toast-enter pointer-events-auto rounded-xl px-4 py-3 text-sm shadow-lg ${palette[variant] || palette.default}`;
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(-6px)';
+          setTimeout(() => toast.remove(), 200);
+        }, 2600);
+      }
+
+      function showAlert(message, type = 'info') {
+        showToast(message, type === 'danger' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info');
+      }
+
+      // ==================== SPINNER ====================
+      function showSpinner(text = 'Sedang diproses...') {
+        spinnerText.textContent = text;
+        spinnerOverlay.classList.remove('hidden');
+        spinnerOverlay.classList.add('flex');
+      }
+
+      function hideSpinner() {
+        spinnerOverlay.classList.add('hidden');
+        spinnerOverlay.classList.remove('flex');
+      }
+
+      // ==================== MODAL ====================
+      function openModal(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+      }
+
+      function closeModal(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+      }
+
+      document.querySelectorAll('[data-modal-close]').forEach((btn) => {
+        btn.addEventListener('click', () => closeModal(btn.getAttribute('data-modal-close')));
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          closeModal('emailModal');
+          closeModal('bulkModal');
+        }
+      });
+
+      // ==================== TABS ====================
+      function renderTabs() {
+        tabButtons.forEach((btn) => {
+          const isActive = btn.dataset.tab === currentTab;
+          const base = 'tab-btn w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2';
+          const active = 'bg-gradient-to-r from-primary/15 via-white to-accent/25 text-primary shadow-soft border border-primary/40 dark:from-primary/25 dark:via-slate-900 dark:to-accent/30 dark:text-accent';
+          const inactive = 'text-slate-600 border border-transparent hover:bg-muted/60 dark:text-slate-200 dark:hover:bg-slate-800/80';
+          btn.className = `${base} ${isActive ? active : inactive}`;
+        });
+        panels.forEach((panel) => {
+          panel.classList.toggle('hidden', panel.dataset.panel !== currentTab);
+        });
+      }
+
+      tabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          currentTab = btn.dataset.tab;
+          renderTabs();
+        });
+      });
+
+      // ==================== MODE ====================
+      function renderModeButtons() {
+        modeButtons.forEach((btn) => {
+          const isActive = btn.dataset.mode === currentMode;
+          const base = 'mode-btn inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2';
+          const active = 'bg-gradient-to-r from-primary/20 via-white to-accent/30 text-primary shadow-soft border border-transparent dark:from-primary/25 dark:via-slate-900 dark:to-accent/40 dark:text-accent';
+          const inactive = 'border border-slate-200 bg-white text-slate-600 hover:border-primary/40 hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary/40 dark:hover:text-accent';
+          btn.className = `${base} ${isActive ? active : inactive}`;
+        });
+        activeModeLabel.textContent = currentMode === 'nabung' ? 'Nabung' : 'Kirim';
+      }
+
+      modeButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          currentMode = btn.dataset.mode;
+          renderModeButtons();
+          showToast(`Mode diubah ke ${currentMode === 'nabung' ? 'Nabung' : 'Kirim Langsung'}`, 'info');
+        });
+      });
+
+      // ==================== LOCAL PROFILE ====================
+      function loadProfile() {
+        const stored = localStorage.getItem('jobseerProfile');
+        if (!stored) return;
+        try {
+          const profile = JSON.parse(stored);
+          document.getElementById('profileName').value = profile.name || '';
+          document.getElementById('profileEmail').value = profile.email || '';
+          document.getElementById('profileCvUrl').value = profile.cvUrl || '';
+          document.getElementById('profilePrompt').value = profile.prompt || '';
+          updateProfileDisplay(profile);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      function updateProfileDisplay(profile) {
+        const info = document.getElementById('profileInfo');
+        if (!profile || !profile.name) {
+          info.textContent = 'Belum ada profil tersimpan.';
+          return;
+        }
+        info.innerHTML = `
+          <p><span class="font-semibold text-slate-700 dark:text-slate-200">Nama:</span> ${profile.name}</p>
+          <p><span class="font-semibold text-slate-700 dark:text-slate-200">Email:</span> ${profile.email || '-'}</p>
+          <p><span class="font-semibold text-slate-700 dark:text-slate-200">CV:</span> ${profile.cvUrl ? `<a href="${profile.cvUrl}" target="_blank" class="text-primary underline dark:text-accent">Link CV</a>` : 'Belum di-set'}</p>
+          <p><span class="font-semibold text-slate-700 dark:text-slate-200">Prompt:</span> ${profile.prompt || '(default)'}</p>
+        `;
+      }
+
+      document.getElementById('profileForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const profile = {
+          name: document.getElementById('profileName').value.trim(),
+          email: document.getElementById('profileEmail').value.trim(),
+          cvUrl: document.getElementById('profileCvUrl').value.trim(),
+          prompt: document.getElementById('profilePrompt').value.trim(),
+        };
+        localStorage.setItem('jobseerProfile', JSON.stringify(profile));
+        updateProfileDisplay(profile);
+        showToast('Profil tersimpan lokal!', 'success');
+      });
+
+      function requireProfile() {
+        const stored = localStorage.getItem('jobseerProfile');
+        if (!stored) return false;
+        try {
+          const profile = JSON.parse(stored);
+          return Boolean(profile && profile.name);
+        } catch (err) {
+          return false;
+        }
+      }
+
+      // ==================== HELPERS ====================
+      function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = () => reject(new Error(`Gagal membaca file ${file.name}`));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // ==================== FORM: Single Image ====================
+      document.getElementById('imageInput').addEventListener('change', function () {
+        if (!this.files || this.files.length === 0) {
+          singleImageLabel.textContent = 'Belum ada file dipilih';
+          return;
+        }
+        const file = this.files[0];
+        if (file.size > 2 * 1024 * 1024) {
+          showAlert('Ukuran gambar maksimal 2MB!', 'warning');
+          this.value = '';
+          singleImageLabel.textContent = 'Belum ada file dipilih';
+        } else {
+          singleImageLabel.textContent = file.name;
+        }
+      });
+
+      document.getElementById('imageForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!requireProfile()) {
+          showAlert('⚠️ Setup profil dulu sebelum lamaran!', 'warning');
+          currentTab = 'profile';
+          renderTabs();
+          return;
+        }
+        const fileInput = document.getElementById('imageInput');
+        const file = fileInput.files[0];
+        if (!file) {
+          showAlert('Pilih gambar dulu!', 'warning');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const base64 = ev.target.result.split(',')[1];
+          showSpinner('🖼️ Lagi ekstrak teks dari gambar...');
+          google.script.run
+            .withSuccessHandler(handleProcessResult)
+            .withFailureHandler(() => {
+              hideSpinner();
+              showAlert('❌ Gagal memproses gambar!', 'danger');
+            })
+            .processImage(base64, currentMode, '');
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // ==================== FORM: Text ====================
+      document.getElementById('textForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!requireProfile()) {
+          showAlert('⚠️ Setup profil dulu sebelum lamaran!', 'warning');
+          currentTab = 'profile';
+          renderTabs();
+          return;
+        }
+        const text = document.getElementById('textInput').value.trim();
+        if (!text) {
+          showAlert('Isi teks dulu!', 'warning');
+          return;
+        }
+        showSpinner('📄 Lagi parse teks...');
+        google.script.run
+          .withSuccessHandler(handleProcessResult)
+          .withFailureHandler(() => {
+            hideSpinner();
+            showAlert('❌ Gagal memproses teks!', 'danger');
+          })
+          .parseText(text, currentMode, '');
+      });
+
+      // ==================== FORM: Batch Upload ====================
+      document.getElementById('batchImageInput').addEventListener('change', function () {
+        if (!this.files || this.files.length === 0) {
+          batchImageLabel.textContent = 'Belum ada file dipilih';
+          return;
+        }
+        const limit = 5 * 1024 * 1024;
+        for (const file of this.files) {
+          if (file.size > limit) {
+            batchImageLabel.textContent = 'Belum ada file dipilih';
+            this.value = '';
+            showAlert(`File ${file.name} melebihi 5MB`, 'warning');
+            return;
+          }
+        }
+        batchImageLabel.textContent = `${this.files.length} file dipilih`;
+      });
+
+      document.getElementById('batchImageForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const files = Array.from(document.getElementById('batchImageInput').files || []);
+        if (!files.length) {
+          showAlert('Pilih minimal satu gambar!', 'warning');
+          return;
+        }
+        showSpinner('📤 Unggah gambar ke antrean...');
+        try {
+          const base64Files = await Promise.all(files.map((file) => readFileAsDataUrl(file)));
+          const profile = JSON.parse(localStorage.getItem('jobseerProfile') || '{}');
+          const payload = {
+            files: base64Files.map((data, idx) => ({ name: files[idx].name, data })),
+            submittedBy: profile.name || profile.email || 'web_user',
+          };
+          google.script.run
+            .withSuccessHandler((result) => {
+              hideSpinner();
+              if (result && result.message) {
+                showAlert(result.message, result.success ? 'success' : 'info');
+              } else {
+                showAlert('Batch upload selesai.', 'success');
+              }
+              document.getElementById('batchImageForm').reset();
+              batchImageLabel.textContent = 'Belum ada file dipilih';
+              loadStatusStats();
+            })
+            .withFailureHandler(() => {
+              hideSpinner();
+              showAlert('❌ Gagal mengunggah batch!', 'danger');
+            })
+            .uploadBatchScreenshots(payload);
+        } catch (err) {
+          hideSpinner();
+          showAlert(`❌ ${err.message}`, 'danger');
+        }
+      });
+
+      // ==================== QUEUE BUTTONS ====================
+      document.getElementById('runOcrQueueBtn').addEventListener('click', () => {
+        showSpinner('🔁 Menjalankan OCR antrean...');
+        google.script.run
+          .withSuccessHandler((result) => {
+            hideSpinner();
+            if (result && result.message) {
+              showAlert(result.message, result.success === false ? 'info' : 'success');
+            } else {
+              showAlert('Proses OCR dipicu.', 'info');
+            }
+            loadStatusStats();
+          })
+          .withFailureHandler(() => {
+            hideSpinner();
+            showAlert('❌ Gagal memicu OCR massal!', 'danger');
+          })
+          .triggerImageQueue();
+      });
+
+      document.getElementById('runParseQueueBtn').addEventListener('click', () => {
+        showSpinner('🧠 Menjalankan parsing massal...');
+        google.script.run
+          .withSuccessHandler((result) => {
+            hideSpinner();
+            if (result && result.message) {
+              showAlert(result.message, result.success === false ? 'info' : 'success');
+            } else {
+              showAlert('Parsing massal dipicu.', 'info');
+            }
+            loadStatusStats();
+          })
+          .withFailureHandler(() => {
+            hideSpinner();
+            showAlert('❌ Gagal memicu parsing massal!', 'danger');
+          })
+          .triggerParsingQueue();
+      });
+
+      // ==================== BULK SEND ====================
+      document.getElementById('sendBulkBtn').addEventListener('click', () => {
+        showSpinner('📬 Loading lamaran nabung...');
+        google.script.run
+          .withSuccessHandler((result) => {
+            hideSpinner();
+            if (result.items && result.items.length > 0) {
+              showBulkPreview(result.items);
+              openModal('bulkModal');
+            } else {
+              showAlert('Tidak ada lamaran nabung.', 'info');
+            }
+          })
+          .withFailureHandler(() => {
+            hideSpinner();
+            showAlert('❌ Gagal load lamaran!', 'danger');
+          })
+          .getBulkNabung();
+      });
+
+      function showBulkPreview(items) {
+        const list = document.getElementById('bulkListDiv');
+        if (!items.length) {
+          list.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-muted/40 p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">Tidak ada lamaran.</div>';
+          return;
+        }
+        list.innerHTML = items
+          .map((item, idx) => `
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/60">
+              <div class="font-semibold text-slate-700 dark:text-slate-200">${idx + 1}. ${item.role} - ${item.company}</div>
+              <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">📧 ${item.email} · 📍 ${item.location}</div>
+            </div>
+          `)
+          .join('');
+      }
+
+      document.getElementById('confirmBulkSendBtn').addEventListener('click', () => {
+        closeModal('bulkModal');
+        showSpinner('🚀 Kirim semua lamaran...');
+        google.script.run
+          .withSuccessHandler((result) => {
+            hideSpinner();
+            showAlert(result, 'success');
+            loadStatusStats();
+          })
+          .withFailureHandler(() => {
+            hideSpinner();
+            showAlert('❌ Gagal kirim massal!', 'danger');
+          })
+          .sendBulk();
+      });
+
+      // ==================== MANUAL EMAIL ====================
+      document.getElementById('confirmEmailBtn').addEventListener('click', () => {
+        const email = document.getElementById('manualEmailInput').value.trim();
+        if (!email) {
+          showAlert('Email tidak boleh kosong!', 'warning');
+          return;
+        }
+        closeModal('emailModal');
+        showSpinner('📤 Kirim dengan email baru...');
+        google.script.run
+          .withSuccessHandler(handleProcessResult)
+          .withFailureHandler(() => {
+            hideSpinner();
+            showAlert('❌ Gagal kirim!', 'danger');
+          })
+          .retryWithEmail(currentRetryData, email);
+      });
+
+      // ==================== STATUS ====================
+      function loadStatusStats() {
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (result.stats) {
+              const stats = result.stats;
+              document.getElementById('statNabung').textContent = stats.nabung || 0;
+              document.getElementById('statSent').textContent = stats.sent || 0;
+              document.getElementById('statDuplicate').textContent = stats.duplicate || 0;
+              document.getElementById('statFailed').textContent = stats.failed || 0;
+              document.getElementById('statNeedEmail').textContent = stats.need_email || 0;
+              document.getElementById('statTotal').textContent = stats.total || 0;
+              document.getElementById('statOcrQueue').textContent = stats.waiting_ocr || 0;
+              document.getElementById('statParsedQueue').textContent = stats.parsing_ready || 0;
+            }
+            if (result.history && result.history.length > 0) {
+              statusHistory.innerHTML = result.history
+                .map((item) => {
+                  const icon = item.status === 'sent' ? '✅' : item.status === 'duplicate' ? '⚠️' : item.status === 'need_email' ? '📧' : '❌';
+                  return `
+                    <div class="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/60">
+                      <div class="text-sm font-semibold text-slate-700 dark:text-slate-200">${icon} ${item.role} - ${item.company}</div>
+                      <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">📧 ${item.recipient_email}</div>
+                    </div>
+                  `;
+                })
+                .join('');
+            } else {
+              statusHistory.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-300 bg-muted/40 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">Belum ada riwayat pengiriman.</div>';
+            }
+          })
+          .getStatusStats();
+      }
+
+      document.getElementById('refreshStatusBtn').addEventListener('click', loadStatusStats);
+
+      // ==================== HANDLE RESULT ====================
+      function handleProcessResult(result) {
+        hideSpinner();
+        if (!result) {
+          showAlert('Respon kosong dari server.', 'danger');
+          return;
+        }
+        if (result.needsEmail) {
+          currentRetryData = result;
+          document.getElementById('manualEmailInput').value = '';
+          document.getElementById('emailReason').textContent = `⚠️ ${result.reason}`;
+          loadStatusStats();
+          openModal('emailModal');
+          return;
+        }
+        if (result.error) {
+          showAlert(`❌ ${result.error}`, 'danger');
+          return;
+        }
+        if (result.success) {
+          showAlert(`✅ ${result.message}`, 'success');
+          currentRetryData = null;
+          document.getElementById('imageForm').reset();
+          document.getElementById('textInput').value = '';
+          singleImageLabel.textContent = 'Belum ada file dipilih';
+          loadStatusStats();
+          return;
+        }
+        showAlert(result.message || 'Diproses', 'info');
+      }
+
+      // ==================== INIT ====================
+      currentTab = 'submit';
+      renderTabs();
+      renderModeButtons();
+      loadProfile();
+      loadStatusStats();
+    </script>
+  </body>
+</html>

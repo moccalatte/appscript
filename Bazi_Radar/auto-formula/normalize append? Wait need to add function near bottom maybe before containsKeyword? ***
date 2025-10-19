@@ -1,0 +1,39 @@
+/**
+ * Normalises message content returned by providers into plain text.
+ *
+ * @param {*} content
+ * @returns {string}
+ */
+function normalizeMessageContent(content) {
+  if (!content) {
+    return '';
+  }
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content.map(function (part) {
+      if (typeof part === 'string') {
+        return part;
+      }
+      if (part && typeof part === 'object') {
+        if (typeof part.text === 'string') {
+          return part.text;
+        }
+        if (typeof part.content === 'string') {
+          return part.content;
+        }
+      }
+      return '';
+    }).join('\n');
+  }
+  if (typeof content === 'object') {
+    if (typeof content.text === 'string') {
+      return content.text;
+    }
+    if (typeof content.content === 'string') {
+      return content.content;
+    }
+  }
+  return String(content);
+}

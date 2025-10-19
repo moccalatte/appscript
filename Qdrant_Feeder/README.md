@@ -1,129 +1,158 @@
-# 🧠✨ Qdrant Feeder (Google Apps Script)
+# Qdrant Feeder — Panduan Praktis & Terstruktur
 
-🚀 **[WAJIB] Gambaran Singkat** — Skrip Google Apps Script (GAS) yang otomatis memungut kode dari repo GitHub populer, memecahnya menjadi potongan kecil, lalu menyimpan metadata + placeholder vektor ke Qdrant. Semua aktivitas dicatat di spreadsheet `QdrantFeedLogs`.
+Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-*", memilih file kode, memecahnya menjadi chunk, dan mengunggahnya sebagai "points" ke koleksi Qdrant. Dokumentasi ini dirancang agar mudah diikuti oleh operator pemula maupun praktisi.
 
-📌 **[WAJIB] Inti Proyek**
-- 🧩 **[WAJIB] Bahasa yang diproses**: `.py`, `.js`, `.go`
-- 📦 **[WAJIB] Koleksi Qdrant default**: diatur lewat Script Properties
-- 🧭 **[WAJIB] Nama vektor default**: `sentence-transformers/all-MiniLM-L6-v2` (ukuran menyesuaikan konfigurasi koleksi, minimal > 0)
-- 🪪 **[WAJIB] Token yang dibutuhkan**: `GITHUB_PAT`, `QDRANT_API_KEY`
-- 🛠️ **[OPSIONAL] Sesuaikan batas**: `MAX_REPOS_PER_RUN`, `MAX_FILES_PER_REPO`, `CHUNK_SIZE_CHARS`, dll via Script Properties
+## Ringkasan Fitur
+- **Fungsi utama:** Temukan repo dari README "awesome", pilih file (default: `.py`, `.js`, `.go`), pecah jadi chunk, buat "points", upsert ke Qdrant.
+- **Logging & State:**  
+  - Spreadsheet `QdrantFeedLogs` → sheet `logs` (event log & observability)  
+  - Spreadsheet `QdrantFeedLogs` → sheet `awesome_dedup` (dedup utama)
+- **Entry points:**  
+  - `testAwesomeRun()` — uji coba end-to-end  
+  - `prodAwesomeRun()` — run produksi (jadwalkan via trigger)
 
----
+## Daftar Isi
+1. Konfigurasi Script Properties (Wajib & Opsional)
+2. Langkah Cepat Uji Coba (`testAwesomeRun`)
+3. Struktur Log & Dedup
+4. Troubleshooting Praktis
+5. Best Practice & Next Steps
 
-## 🏁 Mulai Dari Nol (Step-by-Step)
-
-1. 📁 **[WAJIB] Buat proyek Google Apps Script**
-   - Buka Google Drive → `New` → `More` → `Google Apps Script`
-   - Atur `Project Settings` → `Time zone` menjadi `Asia/Jakarta`
-
-2. 📄 **[WAJIB] Impor kode utama**
-   - Buat file `Code.gs`
-   - Salin isi terbaru dari [`Code.gs`](Code.gs)
-
-3. 🔐 **[WAJIB] Simpan kredensial di Script Properties**
-   - `GITHUB_PAT` → token GitHub (Fine-grained, baca repositori publik)
-   - `QDRANT_API_KEY` → API key Qdrant
-   - `QDRANT_URL` → target Qdrant Anda (mis. `https://contoh-qdrant.com`)
-   - `QDRANT_COLLECTION` → nama koleksi tujuan (mis. `koleksi_anda`)
-   - `TRIGGER_AUTO_INSTALL` → `true` / `false` (**[OPSIONAL]**, default `true`)
-   - `TRIGGER_DAILY_HOUR` → jam 0–23 (**[OPSIONAL]**, default `1`)
-   - `TRIGGER_INTERVAL_MINUTES` → salah satu: 1, 5, 10, 15, 30 (**[OPSIONAL]**, default `15`)
-   - `TEST_LOOP_MAX_RUNTIME_MS` → durasi loop test per run (ms) (**[OPSIONAL]**, default ~4,6 menit)
-   - `TEST_LOOP_SLEEP_MS` → jeda antar loop test (ms) (**[OPSIONAL]**, default `0`)
-   - `MAX_REPOS_PER_RUN`, `MAX_FILES_PER_REPO`, `MAX_FILE_SIZE_BYTES`, `CHUNK_SIZE_CHARS`, `CHUNK_OVERLAP_CHARS` → isi bila ingin mengganti default (**[OPSIONAL]**)
-
-4. 🪪 **[WAJIB] Cara membuat GITHUB_PAT (Fine-grained)**
-   - GitHub → `Settings` → `Developer settings` → `Personal access tokens`
-   - Pilih `Fine-grained token`
-   - Tetapkan akses `Public repositories (read-only)`
-   - Aktifkan izin `Code: Read`, `Metadata: Read`
-   - Salin token dan simpan sebagai `GITHUB_PAT`
-
-5. 📑 **[WAJIB] Biarkan skrip menyiapkan log sheet**
-   - Jalankan `tick()` sekali (menu `Run`)
-   - Spreadsheet `QdrantFeedLogs` + sheet `logs` akan dibuat otomatis
-
-6. ⏰ **[WAJIB] Biarkan skrip mengelola trigger**
-   - Pastikan `TRIGGER_AUTO_INSTALL` tetap `true`
-   - Trigger bawaan dibuat otomatis: harian jam 01.00 WIB dan interval setiap 15 menit
-   - Ubah `TRIGGER_DAILY_HOUR` atau `TRIGGER_INTERVAL_MINUTES` bila jadwal perlu disesuaikan
-
-7. 🧪 **[OPSIONAL] Mode uji beruntun**
-   - Jalankan fungsi `tickTest()`; pipeline akan loop terus hingga batas runtime GAS (±6 menit) atau Anda klik `Stop`
-   - Sesuaikan `TEST_LOOP_MAX_RUNTIME_MS` / `TEST_LOOP_SLEEP_MS` jika perlu ritme berbeda
-   - Pantau sheet/log/Qdrant selama loop berjalan
-
-8. 🔍 **[OPSIONAL] Verifikasi ke Qdrant via cURL / client**
-   - Contoh:
-     ```bash
-     curl -s "<QDRANT_URL>/collections/<QDRANT_COLLECTION>" \
-       -H "api-key: <QDRANT_API_KEY>" | jq '.result.points_count'
-     ```
-
-9. 📈 **[OPSIONAL] Pantau setelah beberapa jam**
-   - Lihat pertambahan `points_count`
-   - Lakukan sampling payload untuk memastikan konten sesuai
 
 ---
 
-## ▶️ Cara Menjalankan
+## 1. Konfigurasi Script Properties
 
-1. 🏭 **[WAJIB] Produksi (terjadwal)**
-   - Jalankan `tick()` sekali dari editor untuk otorisasi & pengecekan awal.
-   - Cek `QdrantFeedLogs` guna memastikan baris sukses muncul.
-   - Setelah itu, biarkan trigger otomatis mengeksekusi sesuai `TRIGGER_DAILY_HOUR` + `TRIGGER_INTERVAL_MINUTES`.
-2. 🧪 **[OPSIONAL] Pengujian nonstop**
-   - Jalankan `tickTest()`; fungsi ini memanggil pipeline berulang tanpa jeda (kecuali `TEST_LOOP_SLEEP_MS`) hingga Anda menghentikan eksekusi atau mencapai durasi `TEST_LOOP_MAX_RUNTIME_MS`.
-   - Gunakan tombol Stop di Apps Script saat ingin mengakhiri loop lebih cepat.
-3. 🔍 **[OPSIONAL] Verifikasi ke Qdrant** menggunakan cURL/client favorit untuk melihat kenaikan `points_count`.
-4. 🛠️ **[OPSIONAL] Ubah jadwal** dengan menyesuaikan `TRIGGER_DAILY_HOUR` atau `TRIGGER_INTERVAL_MINUTES`, lalu jalankan `tick()` sekali untuk menerapkan.
+**Wajib:**
+- `GITHUB_PAT` — Hindari rate-limit GitHub (token tanpa prefix `Bearer`)
+- `QDRANT_URL` — URL Qdrant, contoh: `https://qdrant.example.com`
+- `QDRANT_API_KEY` — API key Qdrant (jika diperlukan)
+- `QDRANT_COLLECTION` — Nama koleksi tujuan
 
----
+**Opsional (disarankan):**
+- `USE_AWESOME_DISCOVERY` (true/false) — Aktifkan discovery dari daftar awesome
+- `AWESOME_DEFAULT_LISTS_JSON` — Override daftar sumber README, format:  
+  `[{"owner":"vinta","repo":"awesome-python"}, ...]`
+- `AWESOME_MAX_REPOS_PER_RUN` (default: 5)
+- `AWESOME_MAX_FILES_PER_REPO` (default: 4)
+- `AWESOME_MAX_VALIDATION_REQUESTS` (default: 30)
+- `AWESOME_DEDUP_SHEET_NAME` (default: `awesome_dedup`)
+- `VERBOSE_LOGGING` (true/false) — Jika `true`, log kandidat hasil ekstraksi README (maks 50) ke `logs`
 
-## 🧭 Cara Kerja Singkat
-
-- 🕒 **[WAJIB] Scheduler**: Trigger dibuat & dijaga otomatis berdasar Script Properties
-- 🔍 **[WAJIB] Seleksi repo**: Gunakan GitHub Search (rolling window, skip rate-limit)
-- 📂 **[WAJIB] Seleksi file**: Filter ekstensi, ukuran ≤ 64KB, hindari folder `test/tests/examples/dist/node_modules/vendor`
-- ✂️ **[WAJIB] Chunking**: Potong teks ±3000 karakter dengan overlap 200
-- 📦 **[WAJIB] Upsert**: Kirim batch ≤ 50 poin per file ke Qdrant (PUT `?wait=true`)
-- 📘 **[WAJIB] Logging**: Simpan detail chunk (HTTP status, error, durasi) ke sheet
-- ♻️ **[WAJIB] Dedup**: Catat `repo@blob_sha:path` di Script Properties setelah upsert sukses
 
 ---
 
-## 🧪 Checklist Pengujian
+## 2. Dedup & Trigger
 
-- ✅ **[WAJIB] Jalankan `tick()` tanpa trigger** dan pastikan tidak ada error merah di Apps Script
-- ✅ **[WAJIB] Periksa sheet**: minimal satu baris sukses dengan `qdrant_http_status` 200
-- ✅ **[WAJIB] Cek Qdrant**: hitung `points_count` atau cari payload terbaru
-- 🔄 **[OPSIONAL] Ulangi pengujian** dengan mengubah `MAX_REPOS_PER_RUN` kecil (mis. 1) untuk simulasi throttling
-- 🧪 **[OPSIONAL] Cek dedup**: jalankan `tick()` dua kali berturut-turut, pastikan baris kedua menampilkan `dedup-skip`
+**Deduplication:**
+- Sheet `awesome_dedup` adalah sumber utama dedup (anti duplikasi).
+- Kunci dedup hanya ditulis setelah upsert ke Qdrant sukses (kode 2xx).
+- Untuk legacy, beberapa helper masih pakai `PropertiesService` — migrasi ke sheet disarankan.
 
----
+**Trigger:**
+- Otomatis:  
+  - Set `TRIGGER_AUTO_INSTALL=true`, `TRIGGER_INTERVAL_MINUTES=15`, `TRIGGER_DAILY_HOUR=1`
+  - Fungsi `ensureScheduledTriggers()` akan membuat trigger berkala & harian
+- Manual:  
+  - Tambahkan trigger via Apps Script UI → pilih function (`prodAwesomeRun`/`tick`), event source: Time-driven
 
-## 🛠️ Operasional & Pemeliharaan
+**Tips:**
+- Mulai dengan `AWESOME_MAX_REPOS_PER_RUN=2–5` untuk pipeline stabil
+- Pastikan `GITHUB_PAT` tersedia agar tidak terkena rate limit
+- Atur chunking & file limit: `CHUNK_SIZE_CHARS`, `CHUNK_OVERLAP_CHARS`, `MAX_FILE_SIZE_BYTES`
 
-- 📉 **[WAJIB] Jika kena rate limit GitHub (403)** → turunkan `MAX_REPOS_PER_RUN` atau tambah jendela waktu pencarian
-- 📏 **[WAJIB] Jika ada `raw-too-large`** → kurangi `MAX_FILE_SIZE_BYTES` atau `CHUNK_SIZE_CHARS`
-- ⏰ **[OPSIONAL] Ubah jadwal trigger**: set `TRIGGER_DAILY_HOUR` (0–23) & `TRIGGER_INTERVAL_MINUTES` (1/5/10/15/30), lalu jalankan `tick()` sekali untuk menerapkan
-- 🔁 **[OPSIONAL] Atur pengujian**: gunakan `TEST_LOOP_MAX_RUNTIME_MS` & `TEST_LOOP_SLEEP_MS` untuk mengendalikan durasi/frekuensi `tickTest()`
-- 🧹 **[OPSIONAL] Bersihkan dedup**: hapus properti `DEDUP_*` bila perlu memproses ulang repo lama
-- 📊 **[OPSIONAL] Simpan cadangan log**: unduh sheet berkala untuk audit
-
----
-
-## 💡 FAQ Ringkas
-
-- ❓ **[WAJIB] Kenapa vektor nol?** Placeholder wajib karena skema Qdrant membutuhkan vektor; dapat diganti embedding asli di proses lanjutan
-- ❓ **[WAJIB] Bisa tambah bahasa lain?** Bisa dengan mengubah fungsi `isEligiblePath`, tetapi bersiap terhadap kuota dan ukuran file
-- ❓ **[WAJIB] Kenapa batch 50 poin?** Batas aman untuk Apps Script agar permintaan cepat dan stabil
-- ❓ **[OPSIONAL] Bagaimana kalau ingin jadwal berbeda?** Atur `TRIGGER_DAILY_HOUR` dan `TRIGGER_INTERVAL_MINUTES`, lalu jalankan `tick()` untuk memperbarui trigger
 
 ---
 
-## 📚 Referensi
+## 3. Langkah Cepat Uji Coba
 
-- 📄 **[WAJIB] Detail implementasi kode**: [`Code.gs`](Code.gs)
-- 🧭 **[WAJIB] Dokumen produk lengkap**: [`prd.md`](prd.md)
+1. Pastikan file `Code.gs` dan `awesome_integration.gs` tersedia
+2. Isi Script Properties wajib (`GITHUB_PAT`, `QDRANT_URL`, `QDRANT_API_KEY`, `QDRANT_COLLECTION`)
+3. (Opsional) Set `VERBOSE_LOGGING=true` untuk log detail hasil scraping
+4. Jalankan fungsi `testAwesomeRun()` dari dropdown Apps Script, klik Run
+5. Cek spreadsheet `QdrantFeedLogs`:
+   - Sheet `logs` untuk event run
+   - Sheet `awesome_dedup` untuk kunci dedup
+
+**Hasil yang diharapkan:**
+- Baris `awesome-repos-found ...` menunjukkan repo yang dipilih
+- Per-file: status upsert Qdrant (`qdrant_http_status`)
+- Jika gagal upsert, cek `error_message` (misal: `no-eligible-files`, `no-chunks`, `raw-too-large`, `dedup-skip (sheet)`)
+- Jika `VERBOSE_LOGGING=true`, akan ada row `verbose-extracted` per README
+
+
+---
+
+## 4. Struktur Log & Dedup
+
+**Sheet `logs`:**
+- Kolom: `timestamp`, `repo`, `file_path`, `size_bytes`, `chunk_idx/total`, `point_id`, `qdrant_http_status`, `qdrant_result_points_upserted`, `error_message`, `elapsed_ms`, `dedup_key`, `dedup_ts`
+
+**Sheet `awesome_dedup`:**
+- Kolom: `dedup_key` (`owner/repo@blobSha:path`), `ts` (ISO UTC)
+
+**Catatan:**
+- Dedup hanya ditulis setelah upsert sukses
+- Observability event juga dicatat ke `logs` (baris `dedup-key-added`)
+
+
+---
+
+## 5. Troubleshooting Praktis
+
+- **No upserts; logs show `no-eligible-files`:**  
+  Repo tidak punya file yang diizinkan atau terlalu besar.  
+  *Solusi:* Tambah ekstensi di `isEligiblePath()`, atau naikkan `MAX_FILE_SIZE_BYTES`.
+
+- **Discovered repos fewer than expected:**  
+  Banyak kandidat di README di-skip (archived/private/disabled) atau limit terlalu kecil.  
+  *Solusi:* Naikkan `AWESOME_MAX_VALIDATION_REQUESTS`, aktifkan `VERBOSE_LOGGING`.
+
+- **GitHub 403 / rate-limit:**  
+  *Solusi:* Set `GITHUB_PAT` (token minimal read-only).
+
+- **Qdrant upsert errors (non-2xx):**  
+  *Solusi:* Cek `qdrant_http_status`, `error_message`, pastikan konfigurasi Qdrant benar.
+
+- **Script timeout:**  
+  *Solusi:* Kurangi `AWESOME_MAX_REPOS_PER_RUN` / `AWESOME_MAX_FILES_PER_REPO`, gunakan trigger berkala.
+
+
+---
+
+## 6. Best Practice & Next Steps
+
+- Mulai dengan `AWESOME_MAX_REPOS_PER_RUN=1` dan `AWESOME_MAX_FILES_PER_REPO=1` untuk pengujian awal
+- Aktifkan `VERBOSE_LOGGING` untuk debugging discovery
+- Simpan dedup di sheet `awesome_dedup`, gunakan logs untuk observability
+- Di produksi, gunakan trigger dan batasi per-run agar tidak melebihi quota API/GAS
+- Untuk pengembangan, integrasikan embedding nyata (OpenAI/dll), pastikan ukuran vektor cocok dengan koleksi Qdrant
+- Tambahkan monitoring sederhana: hitung baris `no-eligible-files`, `no-chunks`, dan error status di logs
+
+
+---
+
+## 7. FAQ Singkat
+
+- **Bagaimana mengubah daftar README sumber?**  
+  Set Script Property `AWESOME_DEFAULT_LISTS_JSON` (format JSON array)
+
+- **Ingin melihat semua kandidat dari README?**  
+  Aktifkan `VERBOSE_LOGGING=true` — log sample kandidat ke `logs`
+
+- **Reset dedup untuk testing?**  
+  Hapus entri di sheet `awesome_dedup` (atau hapus sheet untuk reset total)
+
+- **Efek `USE_AWESOME_DISCOVERY=false`?**  
+  `pickRepos()` akan skip discovery saat dipanggil dari `tick()`, tapi tetap aktif di `runAwesomeFeed()` kecuali kode diubah
+
+---
+
+## 8. Bantuan & Next Steps
+
+- Jika butuh contoh Script Properties, migrasi dedup, atau integrasi embedding, silakan hubungi
+- Untuk debugging, kirimkan 20 baris awal dari sheet `logs` agar bisa dibantu interpretasi hasil run
+
+---
+
+**Proyek Qdrant Feeder siap digunakan, mudah dioperasikan, dan dapat dikembangkan sesuai kebutuhan.**
