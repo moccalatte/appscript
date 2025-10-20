@@ -6,7 +6,7 @@
 - **Output:** Points di koleksi Qdrant, log granular di spreadsheet.
 
 ## 2. Sasaran Utama
-1. Mengirim file `.py`, `.js`, `.go` dari repo populer secara bertahap dan stabil.
+1. Mengirim file `.py`, `.js`, `.ts`, `.go` dari repo populer secara bertahap dan stabil.
 2. Dedup berbasis key `repo_fullname@blob_sha:path` (sheet utama: `awesome_dedup`).
 3. Logging detail per chunk dan event dedup ke sheet `logs`.
 4. Menjaga penggunaan kuota Apps Script dan GitHub API tetap aman.
@@ -26,7 +26,7 @@
 2. **Uji Coba:** Fungsi `testAwesomeRun()` untuk pengujian end-to-end.
 3. **Lock:** Setiap run memperoleh lock untuk mencegah overlap.
 4. **Preflight:** Validasi koleksi Qdrant dan vector config.
-5. **Discovery:** Pilih repo via GitHub Search API atau daftar awesome (opsional).
+5. **Discovery:** Pilih repo via GitHub Search API atau daftar awesome (opsional), dengan riwayat repo untuk menghindari kandidat berulang dalam jangka pendek.
 6. **File Selection:** Pilih file eligible, chunking, dedup, upsert ke Qdrant, logging.
 
 ## 6. Integrasi Eksternal
@@ -34,8 +34,8 @@
 - **Qdrant HTTP API:** Preflight koleksi, upsert points.
 
 ## 7. Seleksi Repo & File
-- **Repo:** Maksimum per run (`AWESOME_MAX_REPOS_PER_RUN`), filter bahasa, stars, waktu push.
-- **File:** Ekstensi `.py`, `.js`, `.go`, folder yang dihindari, ukuran maksimum (`MAX_FILE_SIZE_BYTES`), prioritas file utama.
+- **Repo:** Maksimum per run (`AWESOME_MAX_REPOS_PER_RUN`), filter bahasa utama (via `AWESOME_ALLOWED_LANGS_JSON`), bintang, waktu push, dan status riwayat (`awesome_repo_history`) agar repo yang sudah diproses (atau tidak punya chunk) dilewati sampai TTL berakhir.
+- **File:** Ekstensi `.py`, `.js`, `.ts`, `.go`, folder yang dihindari, ukuran maksimum (`MAX_FILE_SIZE_BYTES`), prioritas file utama.
 
 ## 8. Chunking & Payload
 - Chunk size (`CHUNK_SIZE_CHARS`), overlap (`CHUNK_OVERLAP_CHARS`).
@@ -50,6 +50,7 @@
 ## 10. Logging & Observability
 - Sheet `logs`: granular per chunk, event dedup, error, summary run.
 - Sheet `awesome_dedup`: kunci dedup dan timestamp.
+- Sheet `awesome_repo_history`: status terakhir setiap repo (processed, no-eligible-files, dedup-only, errors, skip-history) beserta commit SHA & timestamp.
 
 ## 11. Error Handling
 - Preflight gagal: run dihentikan, log run-level.
@@ -74,11 +75,15 @@
 | `TRIGGER_INTERVAL_MINUTES` | Default 15                                        |
 | `VERBOSE_LOGGING`          | Default false                                     |
 | `AWESOME_DEFAULT_LISTS_JSON`| Opsional, override daftar awesome                |
+| `AWESOME_ALLOWED_LANGS_JSON`| Default `["python","javascript","typescript","go"]` |
+| `AWESOME_SKIP_AWESOME_NAMED`| Default true, skip repo bernama `awesome-*`      |
+| `AWESOME_HISTORY_SHEET_NAME`| Default `awesome_repo_history`                   |
+| `AWESOME_HISTORY_EXPIRY_DAYS`| Default 30, TTL riwayat sebelum repo di-scan ulang |
 
 ## 13. Acceptance Criteria
 1. Trigger berjalan otomatis/manual sesuai konfigurasi, tanpa konflik lock.
 2. Setiap run menghasilkan minimal satu baris sukses di sheet `logs`.
-3. Dedup mencegah pengiriman ulang chunk yang sama.
+3. Dedup mencegah pengiriman ulang chunk yang sama, dan riwayat repo memastikan kandidat yang sudah diproses tidak dipilih lagi sebelum TTL/commit berubah.
 4. Qdrant menerima data (points_count bertambah).
 5. Log summary tersedia untuk audit.
 

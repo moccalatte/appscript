@@ -49,7 +49,11 @@ function readAwesomeIntegrationConfig() {
     maxFilesPerRepo: 4,
     maxValidationRequests: 30,
     dedupSheetName: 'awesome_dedup',
-    verboseLogging: false
+    verboseLogging: false,
+    allowedPrimaryLanguages: ['python', 'javascript', 'typescript', 'go'],
+    skipAwesomeNamedRepos: true,
+    historySheetName: 'awesome_repo_history',
+    historyExpiryDays: 30
   };
   try {
     var props = PropertiesService.getScriptProperties();
@@ -79,6 +83,39 @@ function readAwesomeIntegrationConfig() {
     if (!isNaN(mv) && mv > 0) cfg.maxValidationRequests = mv;
     var dn = props.getProperty('AWESOME_DEDUP_SHEET_NAME');
     if (dn) cfg.dedupSheetName = dn;
+    var hs = props.getProperty('AWESOME_HISTORY_SHEET_NAME');
+    if (hs) cfg.historySheetName = hs;
+    var hd = parseInt(props.getProperty('AWESOME_HISTORY_EXPIRY_DAYS') || '', 10);
+    if (!isNaN(hd)) cfg.historyExpiryDays = hd;
+    var al = props.getProperty('AWESOME_ALLOWED_LANGS_JSON');
+    if (al) {
+      try {
+        var parsedLangs = JSON.parse(al);
+        if (Array.isArray(parsedLangs) && parsedLangs.length > 0) {
+          var cleanedLangs = [];
+          for (var li = 0; li < parsedLangs.length; li++) {
+            var lang = parsedLangs[li];
+            if (lang && typeof lang === 'string') {
+              cleanedLangs.push(String(lang).toLowerCase());
+            }
+          }
+          if (cleanedLangs.length > 0) {
+            cfg.allowedPrimaryLanguages = cleanedLangs;
+          }
+        }
+      } catch (eLang) {
+        // ignore invalid JSON, keep default
+      }
+    }
+    var skipAwesomeNamedRaw = props.getProperty('AWESOME_SKIP_AWESOME_NAMED');
+    if (skipAwesomeNamedRaw !== null && skipAwesomeNamedRaw !== undefined && skipAwesomeNamedRaw !== '') {
+      var skipStr = String(skipAwesomeNamedRaw).toLowerCase();
+      if (skipStr === 'false' || skipStr === '0' || skipStr === 'no') {
+        cfg.skipAwesomeNamedRepos = false;
+      } else if (skipStr === 'true' || skipStr === '1' || skipStr === 'yes') {
+        cfg.skipAwesomeNamedRepos = true;
+      }
+    }
 
     // VERBOSE_LOGGING can be set as Script Property (true/1/yes)
     var vb = props.getProperty('VERBOSE_LOGGING');
@@ -286,6 +323,176 @@ function appendDedupKeys(sheet, keys) {
   }
 }
 
+/* ---------- Repo history helpers ---------- */
+
+function getRepoHistorySheet(name) {
+  var sheetName = name || 'awesome_repo_history';
+  try {
+    var ss = findOrCreateSpreadsheet('QdrantFeedLogs');
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      try {
+        sheet = ss.insertSheet(sheetName);
+        sheet.appendRow(['repo_full_name', 'last_status', 'commit_sha', 'ts']);
+      } catch (eCreate) {
+        sheet = null;
+      }
+    } else {
+      ensureHistorySheetHeader(sheet);
+    }
+    return sheet;
+  } catch (e) {
+    return null;
+  }
+}
+
+function ensureHistorySheetHeader(sheet) {
+  if (!sheet) return;
+  try {
+    var lastRow = sheet.getLastRow();
+    if (lastRow === 0) {
+      sheet.appendRow(['repo_full_name', 'last_status', 'commit_sha', 'ts']);
+      return;
+    }
+    var header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 4)).getValues();
+    if (!header || !header[0] || header[0][0] !== 'repo_full_name') {
+      if (header && header[0]) {
+        sheet.insertRowBefore(1);
+      }
+      sheet.getRange(1, 1, 1, 4).setValues([['repo_full_name', 'last_status', 'commit_sha', 'ts']]);
+    }
+  } catch (e) {
+    // ignore header issues
+  }
+}
+
+function loadRepoHistoryMap(sheet, expiryDays) {
+  var map = {};
+  if (!sheet) return map;
+  ensureHistorySheetHeader(sheet);
+  try {
+    var last = sheet.getLastRow();
+    if (last < 2) return map;
+    var vals = sheet.getRange(2, 1, last - 1, 4).getValues();
+    var nowMs = new Date().getTime();
+    var hasExpiry = (typeof expiryDays === 'number' && expiryDays > 0);
+    var windowMs = hasExpiry ? (expiryDays * 86400000) : 0;
+    for (var i = 0; i < vals.length; i++) {
+      var row = vals[i];
+      if (!row || row.length === 0) continue;
+      var repo = row[0];
+      if (!repo) continue;
+      var key = String(repo).toLowerCase();
+      var status = row[1] || '';
+      var commitSha = row[2] || '';
+      var tsRaw = row[3];
+      var tsStr = '';
+      var tsMs = NaN;
+      if (tsRaw) {
+        if (tsRaw instanceof Date) {
+          tsMs = tsRaw.getTime();
+          tsStr = Utilities.formatDate(tsRaw, 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
+        } else if (typeof tsRaw === 'string') {
+          tsStr = tsRaw;
+          tsMs = new Date(tsRaw).getTime();
+        }
+      }
+      var isFresh = false;
+      if (!isNaN(tsMs)) {
+        if (hasExpiry) {
+          isFresh = (nowMs - tsMs) <= windowMs;
+        } else {
+          isFresh = false;
+        }
+      }
+      map[key] = {
+        status: status || '',
+        commitSha: commitSha || '',
+        tsStr: tsStr,
+        tsMs: tsMs,
+        row: i + 2,
+        isFresh: isFresh
+      };
+    }
+  } catch (e) {
+    // ignore read issues
+  }
+  return map;
+}
+
+function recordRepoHistory(sheet, historyMap, repoFullName, status, commitSha, tz, expiryDays) {
+  if (!repoFullName) return;
+  var hasExpiry = (typeof expiryDays === 'number' && expiryDays > 0);
+  var now = new Date();
+  var tsIso = Utilities.formatDate(now, tz || 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
+  var tsMs = now.getTime();
+  var key = String(repoFullName).toLowerCase();
+
+  if (!sheet) {
+    if (historyMap) {
+      historyMap[key] = {
+        status: status || '',
+        commitSha: commitSha || '',
+        tsStr: tsIso,
+        tsMs: tsMs,
+        row: null,
+        isFresh: hasExpiry
+      };
+    }
+    return;
+  }
+
+  ensureHistorySheetHeader(sheet);
+  var rowValues = [[repoFullName, status || '', commitSha || '', tsIso]];
+  try {
+    var existing = historyMap && historyMap[key];
+    if (existing && existing.row) {
+      sheet.getRange(existing.row, 1, 1, 4).setValues(rowValues);
+      if (historyMap) {
+        historyMap[key] = {
+          status: status || '',
+          commitSha: commitSha || '',
+          tsStr: tsIso,
+          tsMs: tsMs,
+          row: existing.row,
+          isFresh: hasExpiry
+        };
+      }
+      return;
+    }
+    var appendAt = sheet.getLastRow() + 1;
+    sheet.getRange(appendAt, 1, 1, 4).setValues(rowValues);
+    if (historyMap) {
+      historyMap[key] = {
+        status: status || '',
+        commitSha: commitSha || '',
+        tsStr: tsIso,
+        tsMs: tsMs,
+        row: appendAt,
+        isFresh: hasExpiry
+      };
+    }
+  } catch (e) {
+    // fallback appendRow
+    try {
+      sheet.appendRow(rowValues[0]);
+      if (historyMap) {
+        var newRow = sheet.getLastRow();
+        historyMap[key] = {
+          status: status || '',
+          commitSha: commitSha || '',
+          tsStr: tsIso,
+          tsMs: tsMs,
+          row: newRow,
+          isFresh: hasExpiry
+        };
+      }
+    } catch (e2) {
+      // ignore write failure
+    }
+  }
+}
+
 /* ---------- Discovery -> Validation -> Feed pipeline ---------- */
 
 /**
@@ -295,11 +502,20 @@ function appendDedupKeys(sheet, keys) {
  *
  * This function validates each candidate's GitHub metadata (limited requests).
  */
-function discoverReposFromAwesomeLists(maxRepos) {
+function discoverReposFromAwesomeLists(maxRepos, opts) {
   maxRepos = (typeof maxRepos === 'number' && maxRepos > 0) ? maxRepos : 10;
+  opts = opts || {};
   var cfg = readAwesomeIntegrationConfig();
   var lists = cfg.lists;
   var maxValidationRequests = cfg.maxValidationRequests;
+  var allowedLangs = cfg.allowedPrimaryLanguages || [];
+  var allowedLangsMap = {};
+  for (var ai = 0; ai < allowedLangs.length; ai++) {
+    var langKey = String(allowedLangs[ai] || '').toLowerCase();
+    if (langKey) allowedLangsMap[langKey] = true;
+  }
+  var historySheet = opts.historySheet || getRepoHistorySheet(cfg.historySheetName);
+  var historyMap = opts.historyMap || loadRepoHistoryMap(historySheet, cfg.historyExpiryDays);
 
   var candidates = [];
   var seen = {};
@@ -336,8 +552,34 @@ function discoverReposFromAwesomeLists(maxRepos) {
     for (var j = 0; j < extracted.length && candidates.length < maxRepos; j++) {
       var e = extracted[j];
       if (!e || !e.owner || !e.name) continue;
-      var key = (e.owner + '/' + e.name).toLowerCase();
+      var ownerLower = String(e.owner).toLowerCase();
+      var repoLower = String(e.name).toLowerCase();
+      var key = ownerLower + '/' + repoLower;
       if (seen[key]) continue;
+      if (cfg.skipAwesomeNamedRepos && repoLower.indexOf('awesome') !== -1) {
+        if (cfg.verboseLogging) {
+          try { appendLogIfAvailable('awesome-discovery-skip-name', e.owner + '/' + e.name); } catch (eLogNamePre) {}
+        }
+        continue;
+      }
+      if (ownerLower === String(cur.owner || '').toLowerCase()) {
+        if (cfg.verboseLogging) {
+          try { appendLogIfAvailable('awesome-discovery-skip-self', e.owner + '/' + e.name); } catch (eLogSelf) {}
+        }
+        continue;
+      }
+      var historyEntry = historyMap ? historyMap[key] : null;
+      if (historyEntry && historyEntry.isFresh) {
+        if (cfg.verboseLogging) {
+          try {
+            appendLogIfAvailable(
+              'awesome-discovery-skip-history',
+              e.owner + '/' + e.name + ' status=' + String(historyEntry.status || '')
+            );
+          } catch (eLogHist) {}
+        }
+        continue;
+      }
       // Validate metadata via GitHub to avoid false positives
       if (validations >= maxValidationRequests) break;
       validations++;
@@ -354,6 +596,27 @@ function discoverReposFromAwesomeLists(maxRepos) {
           if (meta.archived || meta.private || meta.disabled) {
             // skip
             continue;
+          }
+          var primaryLang = meta.language ? String(meta.language).toLowerCase() : '';
+          var langAllowed = allowedLangs.length === 0 ? true : !!allowedLangsMap[primaryLang];
+          if (!langAllowed) {
+            if (cfg.verboseLogging) {
+              try {
+                appendLogIfAvailable('awesome-discovery-skip-lang', meta.full_name + ' lang=' + (meta.language || 'null'));
+              } catch (eLogLang) {}
+            }
+            continue;
+          }
+          if (cfg.skipAwesomeNamedRepos) {
+            var nameLower = meta.name ? String(meta.name).toLowerCase() : '';
+            if (nameLower.indexOf('awesome') !== -1) {
+              if (cfg.verboseLogging) {
+                try {
+                  appendLogIfAvailable('awesome-discovery-skip-name', meta.full_name);
+                } catch (eLogName) {}
+              }
+              continue;
+            }
           }
           seen[key] = true;
           candidates.push({ owner: e.owner, name: e.name, stars: (meta.stargazers_count || 0), fullName: meta.full_name });
@@ -396,11 +659,13 @@ function runAwesomeFeed(opts) {
     return false;
   }
   var vectorCfg = pf.vector || { useNamed: false, size: 384, name: null };
+  var historySheet = getRepoHistorySheet(cfg.historySheetName);
+  var historyMap = loadRepoHistoryMap(historySheet, cfg.historyExpiryDays);
 
   // Discover repos
   var repos = [];
   try {
-    repos = discoverReposFromAwesomeLists(maxRepos);
+    repos = discoverReposFromAwesomeLists(maxRepos, { historySheet: historySheet, historyMap: historyMap });
   } catch (e) {
     appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'discoverRepos error: ' + String(e), 0)]);
     return false;
@@ -424,52 +689,77 @@ function runAwesomeFeed(opts) {
 
   for (var ri = 0; ri < repos.length; ri++) {
     var repo = repos[ri];
-    processedRepos++;
-    try {
-      var meta = fetchRepoMeta(repo.owner, repo.name);
-      var tree = listTreeRecursive(repo.owner, repo.name, meta.commitSha);
-      // Re-use Code.gs selectFiles but allow overriding maxFilesPerRepo
-      var files = selectFiles(tree, maxFilesPerRepo, getConfig().MAX_FILE_SIZE_BYTES, repo.fullName, meta.commitSha);
+    if (!repo) continue;
+    var repoFullName = repo.fullName || (repo.owner + '/' + repo.name);
+    var repoKeyLower = String(repoFullName).toLowerCase();
+    var historyEntry = historyMap ? historyMap[repoKeyLower] : null;
+    var meta = null;
+    var repoStatus = 'pending';
+    var repoInsertedPoints = 0;
+    var repoHadFiles = false;
+    var repoHadErrors = false;
+    var historyRecorded = false;
 
-      // NEW: log when no eligible files were found for a repo so it's visible in the logs sheet
+    try {
+      meta = fetchRepoMeta(repo.owner, repo.name);
+      if (historyEntry && historyEntry.isFresh && historyEntry.commitSha && historyEntry.commitSha === meta.commitSha) {
+        repoStatus = 'skip-history';
+        if (cfg.verboseLogging) {
+          try {
+            appendLogIfAvailable('awesome-history-skip', repoFullName + ' commit=' + meta.commitSha);
+          } catch (eHistLog) {}
+        }
+        recordRepoHistory(historySheet, historyMap, repoFullName, repoStatus, meta.commitSha, tz, cfg.historyExpiryDays);
+        historyRecorded = true;
+        continue;
+      }
+
+      processedRepos++;
+
+      var tree = listTreeRecursive(repo.owner, repo.name, meta.commitSha);
+      var files = selectFiles(tree, maxFilesPerRepo, appCfg.MAX_FILE_SIZE_BYTES, repoFullName, meta.commitSha);
+
       if (!files || files.length === 0) {
+        repoStatus = 'no-eligible-files';
         try {
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, '', 0, -1, -1, '', null, 0, 'no-eligible-files (tree_len=' + (tree ? tree.length : 0) + ')', 0)]);
-        } catch (e) {
-          // swallow logging errors
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, '', 0, -1, -1, '', null, 0, 'no-eligible-files (tree_len=' + (tree ? tree.length : 0) + ')', 0)]);
+        } catch (eLogNoFiles) {}
+        if (!historyRecorded) {
+          recordRepoHistory(historySheet, historyMap, repoFullName, repoStatus, meta.commitSha, tz, cfg.historyExpiryDays);
+          historyRecorded = true;
         }
         continue;
       }
 
       for (var fi = 0; fi < files.length; fi++) {
         var file = files[fi];
-        var dkey = dedupKey(repo.fullName, file.path, file.sha);
+        repoHadFiles = true;
+        var dkey = dedupKey(repoFullName, file.path, file.sha);
 
-        // Dedup check using sheet map
         if (dedupMap[dkey]) {
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, file.size || 0, -1, -1, '', null, 0, 'dedup-skip (sheet)', 0)]);
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, file.size || 0, -1, -1, '', null, 0, 'dedup-skip (sheet)', 0)]);
           continue;
         }
 
         var raw = fetchRaw(repo.owner, repo.name, meta.commitSha, file.path);
         if (raw.error) {
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, file.size || 0, -1, -1, '', null, 0, raw.error, 0)]);
+          repoHadErrors = true;
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, file.size || 0, -1, -1, '', null, 0, raw.error, 0)]);
           continue;
         }
-        if (raw.bytes > getConfig().MAX_FILE_SIZE_BYTES) {
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'raw-too-large', 0)]);
+        if (raw.bytes > appCfg.MAX_FILE_SIZE_BYTES) {
+          repoHadErrors = true;
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, raw.bytes, -1, -1, '', null, 0, 'raw-too-large', 0)]);
           continue;
         }
 
         var lang = detectLang(file.path);
-        // accept .ts as TypeScript in detection by existing detectLang in Code.gs; if not present, fallback:
         if (!lang) lang = detectLang(file.path);
 
-        var chunks = chunkText(raw.text, getConfig().CHUNK_SIZE_CHARS, getConfig().CHUNK_OVERLAP_CHARS);
-
-        // NEW: if chunking produced no chunks, log and skip
+        var chunks = chunkText(raw.text, appCfg.CHUNK_SIZE_CHARS, appCfg.CHUNK_OVERLAP_CHARS);
         if (!chunks || chunks.length === 0) {
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'no-chunks', 0)]);
+          repoHadErrors = true;
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, raw.bytes, -1, -1, '', null, 0, 'no-chunks', 0)]);
           continue;
         }
 
@@ -477,7 +767,7 @@ function runAwesomeFeed(opts) {
         var rawUrl = 'https://raw.githubusercontent.com/' + repo.owner + '/' + repo.name + '/' + meta.commitSha + '/' + file.path;
 
         var points = makePoints({
-          repoFullName: repo.fullName,
+          repoFullName: repoFullName,
           repoStars: repo.stars,
           defaultBranch: meta.defaultBranch,
           commitSha: meta.commitSha,
@@ -489,25 +779,23 @@ function runAwesomeFeed(opts) {
           fetchedAtIso: Utilities.formatDate(new Date(), tz || 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'")
         }, vectorCfg);
 
-        // NEW: if makePoints returned no points, log and skip
         if (!points || points.length === 0) {
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'no-points-generated', 0)]);
+          repoHadErrors = true;
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, raw.bytes, -1, -1, '', null, 0, 'no-points-generated', 0)]);
           continue;
         }
 
         var fileLogs = [];
         for (var c = 0; c < points.length; c++) {
           var p = points[c];
-          fileLogs.push(makeLogRow(tz, repo.fullName, file.path, raw.bytes, p.payload.chunk_idx, p.payload.chunk_total, p.id, null, 0, '', 0));
+          fileLogs.push(makeLogRow(tz, repoFullName, file.path, raw.bytes, p.payload.chunk_idx, p.payload.chunk_total, p.id, null, 0, '', 0));
         }
 
-        // Upsert in batches <= 50
         var allOk = true;
         for (var s = 0; s < points.length; s += 50) {
           var slice = points.slice(s, Math.min(points.length, s + 50));
           var up = upsertQdrant(slice);
           totalPoints += slice.length;
-          // annotate logs for slice
           for (var li = s; li < Math.min(s + slice.length, fileLogs.length); li++) {
             fileLogs[li][6] = up.status;
             fileLogs[li][7] = up.upserted;
@@ -516,26 +804,40 @@ function runAwesomeFeed(opts) {
           }
           if (up.status >= 200 && up.status < 300) {
             summaryOk = true;
+            repoInsertedPoints += slice.length;
           } else {
+            repoHadErrors = true;
             allOk = false;
             break;
           }
         }
         appendLog(sheetCtx.sheet, fileLogs);
 
-        // On success mark dedup (sheet)
         if (allOk) {
           dedupMap[dkey] = true;
           newDedupKeys.push(dkey);
         }
       }
 
+      if (repoInsertedPoints > 0) {
+        repoStatus = repoHadErrors ? 'partial-success' : 'processed';
+      } else if (repoHadErrors) {
+        repoStatus = 'errors';
+      } else if (repoHadFiles) {
+        repoStatus = 'dedup-only';
+      } else {
+        repoStatus = 'no-eligible-files';
+      }
     } catch (eRepo) {
-      appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, '', 0, -1, -1, '', null, 0, 'repo error: ' + String(eRepo), 0)]);
-      continue;
+      repoStatus = 'error';
+      appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, '', 0, -1, -1, '', null, 0, 'repo error: ' + String(eRepo), 0)]);
     }
-    // In test mode, process only one repo to keep run short
-    if (mode === 'test') {
+
+    if (!historyRecorded) {
+      recordRepoHistory(historySheet, historyMap, repoFullName, repoStatus, (meta && meta.commitSha) ? meta.commitSha : '', tz, cfg.historyExpiryDays);
+    }
+
+    if (mode === 'test' && processedRepos >= 1) {
       break;
     }
   }

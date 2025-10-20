@@ -2,7 +2,7 @@ Qdrant_Feeder/oot_prd.md
 # 🦾 PRD: Qdrant Feeder Self-Hosted + Telegram Bot Control (OOT Edition)
 
 ## 🎯 Visi & Tujuan
-Membangun sistem feeder kode ke Qdrant yang **self-hosted** di laptop/server low-spec (i5-4210, RAM 8GB), dengan kontrol penuh via **bot Telegram** (menu ReplyKeyboardMarkup, conversational, full emoji).  
+Membangun sistem feeder kode ke Qdrant yang **self-hosted** di laptop/server low-spec (i5-4210, RAM 8GB), dengan kontrol penuh via **bot Telegram** (menu ReplyKeyboardMarkup, conversational, full emoji).
 Fokus utama: **chunking optimal, anti duplikat, monitoring/logs ringan via Telegram**, dan penghematan token cost 100x lipat untuk user awam (vibe coder, vibe debugger, vibe engineer).
 
 ---
@@ -13,7 +13,7 @@ Fokus utama: **chunking optimal, anti duplikat, monitoring/logs ringan via Teleg
 - **Database vektor:** Qdrant (self-hosted, di server yang sama, akses via `127.0.0.1:6333`)
 - **Model embedding:** `sentence-transformers/all-MiniLM-L6-v2` (default, bisa upgrade ke model kode jika perlu)
 - **Kontrol & monitoring:** Bot Telegram (ReplyKeyboardMarkup, conversational, full emoji)
-- **Sumber kode:** 
+- **Sumber kode:**
   - Scrape dari GitHub API (otomatis)
   - Import manual dari folder lokal (offline, user bisa download repo sendiri)
 - **Log & monitoring:** Semua via Telegram bot (menu, logs, metrics, error, status)
@@ -43,37 +43,38 @@ Fokus utama: **chunking optimal, anti duplikat, monitoring/logs ringan via Teleg
 ### 2. **Bot Telegram (Kontrol & Monitoring)**
 - **Conversational, full emoji, humanized tone**
 - **Menu utama:**
-  - 🚀 Start Feeding
-  - 📂 Import Lokal
-  - 🔍 Lihat Logs
-  - 📊 Monitoring
-  - ⚙️ Pengaturan
-  - ❓ Bantuan
+  - 🚀 Start Feeding - ReplyKeyboardMarkup > sub-menu ReplyKeyboardMarkup
+  - 📂 Import Lokal - ReplyKeyboardMarkup > sub-menu ReplyKeyboardMarkup
+  - 🔍 Lihat Logs - ReplyKeyboardMarkup > sub-menu ReplyKeyboardMarkup
+  - 📊 Monitoring - ReplyKeyboardMarkup > sub-menu ReplyKeyboardMarkup
+  - ⚙️ Pengaturan - ReplyKeyboardMarkup > sub-menu ReplyKeyboardMarkup
+  - ❓ Bantuan - ReplyKeyboardMarkup > sub-menu ReplyKeyboardMarkup
+  Note: menu ReplyKeyboardMarkup apapun bisa dipanggil di kondisi percakapan apapun, pastikan penamaan unik tidak duplikat.
 - **Fitur bot:**
-  - **Set nama collection** (bisa default, bisa ganti via menu)
+  - **Set nama collection** (bisa set default dan bisa ganti via bot)
   - **Pilih metode feeding** (GitHub/API/manual)
   - **Progress bar feeding** (emoji, status, jumlah chunk, error)
-  - **Show logs:** 
+  - **Show logs:**
     - Daftar repo/file terakhir
     - Jumlah chunk, duplikat, error
     - Token cost estimator (estimasi penghematan token)
     - Status Qdrant (jumlah point, storage, dsb)
-  - **Monitoring ringan:** 
+  - **Monitoring ringan:**
     - Notifikasi feeding selesai/gagal
     - Ringkasan harian/mingguan (opsional)
-  - **Error handling:** 
+  - **Error handling:**
     - Semua error user-friendly, ada emoji & solusi
     - Menu bantuan & FAQ
 
 ### 3. **Best Practice & Pencegahan Masalah**
-- **Resource aware:** 
+- **Resource aware:**
   - Batasi proses paralel, batch kecil (hemat RAM/CPU)
   - Progress & cancel feeding via bot
-- **File watcher (opsional):** 
+- **File watcher (opsional):**
   - Jika folder lokal berubah, otomatis feeding ulang
-- **Backup ringan:** 
+- **Backup ringan:**
   - Export/import log & config via Telegram
-- **Security:** 
+- **Security:**
   - Bot Telegram hanya bisa diakses user tertentu (whitelist ID)
   - Tidak expose Qdrant ke publik
 
@@ -88,7 +89,7 @@ Fokus utama: **chunking optimal, anti duplikat, monitoring/logs ringan via Teleg
 - **Tagging:** Simpan metadata nama fungsi/class, parameter, docstring, dsb
 
 ### **B. Anti Duplikat**
-- **Hash isi chunk** (misal SHA-1/SHA-256)
+- **Hash isi chunk** (misal SHA-256)
 - **Cek hash di Qdrant sebelum insert**
 - **Opsional:** Cek kemiripan embedding (threshold cosine similarity)
 - **Log duplikat ke Telegram**
@@ -103,7 +104,7 @@ Fokus utama: **chunking optimal, anti duplikat, monitoring/logs ringan via Teleg
 
 ## 📝 Monitoring & Logs via Telegram
 
-- **Menu logs:** 
+- **Menu logs:**
   - Show 10 aktivitas terakhir (repo, file, chunk, error)
   - Show statistik (total chunk, duplikat, error, storage)
   - Show status Qdrant (jumlah point, storage, status server)
@@ -139,7 +140,7 @@ Fokus utama: **chunking optimal, anti duplikat, monitoring/logs ringan via Teleg
 ---
 
 ## 🏁 Penutup
-Sistem ini didesain untuk **longterm use**, mudah dioperasikan user awam, dan benar-benar menghemat token cost AI coder.  
+Sistem ini didesain untuk **longterm use**, mudah dioperasikan user awam, dan benar-benar menghemat token cost AI coder.
 Fokus pada chunking optimal, anti duplikat, monitoring/logs ringan via Telegram, dan pengalaman user yang fun, aman, serta bebas error.
 
 ---

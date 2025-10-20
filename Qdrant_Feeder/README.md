@@ -3,10 +3,12 @@
 Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-*", memilih file kode, memecahnya menjadi chunk, dan mengunggahnya sebagai "points" ke koleksi Qdrant. Dokumentasi ini dirancang agar mudah diikuti oleh operator pemula maupun praktisi.
 
 ## Ringkasan Fitur
-- **Fungsi utama:** Temukan repo dari README "awesome", pilih file (default: `.py`, `.js`, `.go`), pecah jadi chunk, buat "points", upsert ke Qdrant.
+- **Fungsi utama:** Temukan repo dari README "awesome", pilih file (default: `.py`, `.js`, `.ts`, `.go`), pecah jadi chunk, buat "points", upsert ke Qdrant.
+- **Filter pintar:** Discovery otomatis menyaring kandidat yang tidak relevan (repo archived/private, bukan bahasa utama yang diizinkan, atau README ekstra `awesome-*`).
 - **Logging & State:**  
   - Spreadsheet `QdrantFeedLogs` → sheet `logs` (event log & observability)  
   - Spreadsheet `QdrantFeedLogs` → sheet `awesome_dedup` (dedup utama)
+- **Riwayat repo:** Sheet `awesome_repo_history` menjaga daftar repo yang sudah diproses (beserta status & commit) agar discovery lompat ke kandidat baru.
 - **Entry points:**  
   - `testAwesomeRun()` — uji coba end-to-end  
   - `prodAwesomeRun()` — run produksi (jadwalkan via trigger)
@@ -38,6 +40,10 @@ Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-
 - `AWESOME_MAX_VALIDATION_REQUESTS` (default: 30)
 - `AWESOME_DEDUP_SHEET_NAME` (default: `awesome_dedup`)
 - `VERBOSE_LOGGING` (true/false) — Jika `true`, log kandidat hasil ekstraksi README (maks 50) ke `logs`
+- `AWESOME_ALLOWED_LANGS_JSON` — Batasi bahasa utama repo (default: `["python","javascript","typescript","go"]`)
+- `AWESOME_SKIP_AWESOME_NAMED` (true/false) — Skip repo yang namanya mengandung `awesome` (default: `true`)
+- `AWESOME_HISTORY_SHEET_NAME` — Nama sheet penanda riwayat repo (default: `awesome_repo_history`)
+- `AWESOME_HISTORY_EXPIRY_DAYS` — TTL riwayat sebelum repo boleh diproses ulang (default: `30`, set `0` untuk selalu re-evaluasi)
 
 
 ---
@@ -91,6 +97,10 @@ Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-
 **Sheet `awesome_dedup`:**
 - Kolom: `dedup_key` (`owner/repo@blobSha:path`), `ts` (ISO UTC)
 
+**Sheet `awesome_repo_history`:**
+- Kolom: `repo_full_name`, `last_status`, `commit_sha`, `ts`
+- Dipakai untuk mem-flag repo yang sudah diproses agar discovery tidak mengulang kandidat yang sama dalam jangka pendek.
+
 **Catatan:**
 - Dedup hanya ditulis setelah upsert sukses
 - Observability event juga dicatat ke `logs` (baris `dedup-key-added`)
@@ -107,6 +117,12 @@ Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-
 - **Discovered repos fewer than expected:**  
   Banyak kandidat di README di-skip (archived/private/disabled) atau limit terlalu kecil.  
   *Solusi:* Naikkan `AWESOME_MAX_VALIDATION_REQUESTS`, aktifkan `VERBOSE_LOGGING`.
+- **Log berulang hanya menampilkan repo `awesome-*`:**  
+  Filter bahasa atau nama belum dikonfigurasi.  
+  *Solusi:* Pastikan `AWESOME_ALLOWED_LANGS_JSON` berisi bahasa target, dan biarkan `AWESOME_SKIP_AWESOME_NAMED=true` agar hanya repo kode yang diproses.
+- **Masih menarget repo yang sama berkali-kali:**  
+  Riwayat repo belum terhapus atau commit belum berubah.  
+  *Solusi:* Periksa sheet `awesome_repo_history`; hapus baris repositori tersebut atau set `AWESOME_HISTORY_EXPIRY_DAYS` ke nilai lebih kecil (bahkan `0`) jika ingin langsung re-run.
 
 - **GitHub 403 / rate-limit:**  
   *Solusi:* Set `GITHUB_PAT` (token minimal read-only).
@@ -125,6 +141,7 @@ Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-
 - Mulai dengan `AWESOME_MAX_REPOS_PER_RUN=1` dan `AWESOME_MAX_FILES_PER_REPO=1` untuk pengujian awal
 - Aktifkan `VERBOSE_LOGGING` untuk debugging discovery
 - Simpan dedup di sheet `awesome_dedup`, gunakan logs untuk observability
+- Manfaatkan `awesome_repo_history` untuk memonitor status terakhir tiap repo dan reset barisnya jika ingin memaksa re-run cepat
 - Di produksi, gunakan trigger dan batasi per-run agar tidak melebihi quota API/GAS
 - Untuk pengembangan, integrasikan embedding nyata (OpenAI/dll), pastikan ukuran vektor cocok dengan koleksi Qdrant
 - Tambahkan monitoring sederhana: hitung baris `no-eligible-files`, `no-chunks`, dan error status di logs
@@ -142,6 +159,8 @@ Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-
 
 - **Reset dedup untuk testing?**  
   Hapus entri di sheet `awesome_dedup` (atau hapus sheet untuk reset total)
+- **Ingin memproses ulang repo tertentu?**  
+  Hapus baris repo itu dari sheet `awesome_repo_history` atau set `AWESOME_HISTORY_EXPIRY_DAYS=0` agar tidak ada TTL.
 
 - **Efek `USE_AWESOME_DISCOVERY=false`?**  
   `pickRepos()` akan skip discovery saat dipanggil dari `tick()`, tapi tetap aktif di `runAwesomeFeed()` kecuali kode diubah
