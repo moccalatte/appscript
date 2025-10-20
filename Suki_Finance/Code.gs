@@ -441,21 +441,26 @@ function listTransactions(limit, categoryFilter) {
   const dataValues = getDataValues_(sh);
   if (!dataValues.length) return { ok: true, items: [] }; // only header exists or sheet empty
 
+  const normalizedFilter = categoryFilter ? String(categoryFilter).trim().toLowerCase() : '';
+  const mapped = dataValues
+    .map(r => {
+      const categoryValue = r[4] == null ? '' : String(r[4]);
+      return {
+        timestamp: formatMaybeDate_(r[0]),
+        direction: String(r[1] || ''),
+        item: String(r[2] || ''),
+        amount: Number(r[3] || 0),
+        category: categoryValue
+      };
+    })
+    .filter(entry => {
+      if (!normalizedFilter) return true;
+      return entry.category.toLowerCase() === normalizedFilter;
+    })
+    .reverse(); // latest first
+
   const limitCount = Math.max(1, limit || 50);
-  const slice = dataValues.slice(-limitCount);
-  const mapped = slice.map(r => ({
-    timestamp: formatMaybeDate_(r[0]),
-    direction: String(r[1]),
-    item: String(r[2]),
-    amount: Number(r[3]),
-    category: String(r[4])
-  })).reverse(); // latest first
-
-  const filtered = categoryFilter
-    ? mapped.filter(it => it.category && it.category.toLowerCase() === categoryFilter.toLowerCase())
-    : mapped;
-
-  return { ok: true, items: filtered };
+  return { ok: true, items: mapped.slice(0, limitCount) };
 }
 
 function getSummary() {

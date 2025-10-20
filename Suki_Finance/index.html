@@ -1,726 +1,1359 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id" data-theme="light">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
-    <title>📒 Suki Finance Tracker</title>
-    <link rel="preconnect" href="https://fonts.gstatic.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;700&display=swap" rel="stylesheet" />
-    <style>
-      :root {
-        --bg: #fafafa;
-        --text: #111;
-        --card: #fff;
-        --border: #000;
-        --shadow: 4px 4px 0 #000;
-        --accent1: #ffd54f; /* yellow */
-        --accent2: #4dd0e1; /* teal */
-        --accent3: #aed581; /* green */
-        --accent4: #ff8a65; /* orange */
-        --accent5: #ba68c8; /* purple */
-        --accent6: #90caf9; /* blue */
-      }
-      [data-theme="dark"] {
-        --bg: #121212;
-        --text: #f5f5f5;
-        --card: #1e1e1e;
-        --border: #f5f5f5;
-        --shadow: 4px 4px 0 #555;
-      }
-
-      * { box-sizing: border-box; }
-      html, body { height: 100%; }
-      body {
-        margin: 0;
-        font-family: "Bricolage Grotesque", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-        background: var(--bg);
-        color: var(--text);
-      }
-
-      .container {
-        max-width: 980px;
-        margin: 0 auto;
-        padding: 16px;
-      }
-
-      header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 16px;
-      }
-
-      .title {
-        display: inline-flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 16px;
-        border: 4px solid var(--border);
-        background: var(--accent2);
-        box-shadow: var(--shadow);
-        border-radius: 12px;
-        font-weight: 700;
-      }
-
-      .toolbar {
-        display: inline-flex;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        border: 4px solid var(--border);
-        background: var(--card);
-        box-shadow: var(--shadow);
-        padding: 10px 14px;
-        border-radius: 12px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: transform 0.05s ease-in-out;
-        text-decoration: none;
-        color: inherit;
-      }
-      .btn:active {
-        transform: translate(2px, 2px);
-        box-shadow: 2px 2px 0 var(--border);
-      }
-      .btn.primary { background: var(--accent6); }
-      .btn.secondary { background: var(--accent4); }
-      .btn.ghost { background: var(--card); }
-      .btn.sheet-link {
-        background: #2e7d32;
-        color: #fff;
-        border-color: #1b5e20;
-      }
-      .btn.sheet-link:active {
-        box-shadow: 2px 2px 0 #1b5e20;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-      }
-      @media (max-width: 720px) {
-        .grid { grid-template-columns: 1fr; }
-        header { flex-direction: column; align-items: flex-start; }
-      }
-
-      .card {
-        background: var(--card);
-        border: 4px solid var(--border);
-        box-shadow: var(--shadow);
-        border-radius: 16px;
-        padding: 16px;
-      }
-
-      .input-area textarea {
-        width: 100%;
-        min-height: 110px;
-        padding: 12px;
-        border: 4px solid var(--border);
-        border-radius: 12px;
-        background: #fff;
-        box-shadow: var(--shadow);
-        font-size: 16px;
-      }
-      .input-actions {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-top: 10px;
-      }
-      .receipt-actions {
-        align-items: center;
-        gap: 12px;
-      }
-      .upload-status {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--text);
-        opacity: 0.8;
-      }
-
-      .summary {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-      }
-      @media (max-width: 640px) {
-        .summary { grid-template-columns: 1fr; }
-      }
-      .summary .stat {
-        padding: 12px;
-        border: 4px solid var(--border);
-        border-radius: 12px;
-        box-shadow: var(--shadow);
-        background: var(--card);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-weight: 700;
-      }
-      .summary .stat.saldo { background: var(--accent1); }
-      .summary .stat.masukBulan { background: var(--accent3); }
-      .summary .stat.keluarBulan { background: var(--accent4); }
-      .summary .stat.totalHari { background: var(--accent2); }
-      .summary .sheet-actions {
-        grid-column: 1 / -1;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        background: transparent;
-        padding: 0;
-        border: none;
-        box-shadow: none;
-      }
-      .summary .sheet-note {
-        margin: 0;
-        font-size: 13px;
-        color: var(--text);
-        opacity: 0.75;
-      }
-
-      .filter-bar {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
-        margin-bottom: 8px;
-      }
-      .filter-bar select {
-        border: 4px solid var(--border);
-        border-radius: 12px;
-        box-shadow: var(--shadow);
-        padding: 8px 12px;
-        background: #fff;
-        font-weight: 700;
-      }
-
-      .list {
-        margin-top: 8px;
-      }
-      .list-item {
-        display: grid;
-        grid-template-columns: 48px 1fr auto;
-        gap: 12px;
-        align-items: center;
-        padding: 10px;
-        border: 4px solid var(--border);
-        border-radius: 12px;
-        box-shadow: var(--shadow);
-        background: var(--card);
-        margin-bottom: 8px;
-      }
-      .list-item .emoji {
-        font-size: 28px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 4px solid var(--border);
-        border-radius: 10px;
-        background: #fff;
-        box-shadow: var(--shadow);
-      }
-      .list-item .meta {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        font-size: 14px;
-      }
-      .list-item .amt {
-        font-weight: 800;
-        font-size: 16px;
-      }
-
-      footer {
-        margin: 20px 0 40px;
-        text-align: center;
-        font-size: 12px;
-        opacity: 0.9;
-      }
-
-      .toast {
-        position: fixed;
-        bottom: 18px;
-        right: 18px;
-        z-index: 9999;
-        display: none;
-        padding: 12px 16px;
-        border-radius: 12px;
-        border: 4px solid var(--border);
-        box-shadow: var(--shadow);
-        background: #fff;
-        font-weight: 700;
-      }
-      .toast.success { background: #c6efce; color: #006100; }
-      .toast.error { background: #f8cecc; color: #9c0006; }
-      .toast.processing { background: #fff3cd; color: #7a5d00; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <header>
-        <div class="title">📒 Suki Finance Tracker</div>
-        <div class="toolbar">
-          <button id="themeToggle" class="btn ghost" title="Toggle Tema">🌙 / ☀️</button>
-          <button id="refreshBtn" class="btn ghost" title="Refresh">🔄 Refresh</button>
-        </div>
-      </header>
-
-      <div class="grid">
-        <section class="card input-area">
-          <h3 style="margin-top:0">📝 Input Teks Natural</h3>
-          <p style="margin-top:0;margin-bottom:8px">
-            Contoh: <strong>keluar kopi 16rb, sabun 10rb</strong> atau <strong>masuk gaji 10jt</strong>
-          </p>
-          <textarea id="rawText" placeholder="Tulis di sini..."></textarea>
-          <div class="input-actions">
-            <button id="btnKeluar" class="btn secondary">💸 Catat Pengeluaran</button>
-            <button id="btnMasuk" class="btn primary">💰 Catat Pemasukan</button>
-            <button id="btnClear" class="btn ghost">🧽 Clear</button>
-          </div>
-          <hr style="border:0;border-top:2px dashed var(--border);margin:18px 0" />
-          <h3 style="margin-top:0">📷 Upload Struk</h3>
-          <p style="margin-top:0;margin-bottom:8px">
-            Foto struk akan diperkecil &amp; dibaca otomatis, lalu setiap produk bakal masuk ke sheet sebagai baris terpisah.
-          </p>
-          <div class="input-actions receipt-actions">
-            <button id="btnUploadKeluar" class="btn secondary">📸 Struk Pengeluaran</button>
-            <button id="btnUploadMasuk" class="btn primary">📸 Struk Pemasukan</button>
-            <span id="receiptStatus" class="upload-status" style="display:none">Sedang memproses…</span>
-          </div>
-          <p style="margin:8px 0 0;font-size:13px;opacity:0.75">
-            Tips: foto tegak lurus, pastikan teks terbaca. File &lt; 8MB akan otomatis diperkecil ke 1200px.
-          </p>
-        </section>
-
-        <section class="card">
-          <h3 style="margin-top:0">📊 Ringkasan</h3>
-          <div class="summary">
-            <div class="stat saldo">
-              <span>Saldo Berjalan</span>
-              <span id="saldoBerjalan">Rp 0</span>
-            </div>
-            <div class="stat masukBulan">
-              <span>Pemasukan Bulan Ini</span>
-              <span id="pemasukanBulanIni">Rp 0</span>
-            </div>
-            <div class="stat keluarBulan">
-              <span>Pengeluaran Bulan Ini</span>
-              <span id="pengeluaranBulanIni">Rp 0</span>
-            </div>
-            <div class="stat totalHari">
-              <span>Total Hari Ini</span>
-              <span id="totalHariIni">Rp 0</span>
-            </div>
-            <div class="sheet-actions">
-              <p class="sheet-note">Butuh akses data lengkap? Kamu bisa buka Google Sheet utama kami.</p>
-              <a class="btn sheet-link" href="https://docs.google.com/spreadsheets/d/1LnkXgFHzL9nhVO9Sz0vgEEucuV3J8F2c-o36JoCSc6o/" target="_blank" rel="noopener">
-                📄 Buka Google Sheet
-              </a>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <section class="card">
-        <h3 style="margin-top:0">📋 Daftar Transaksi (5 terakhir)</h3>
-
-        <div class="filter-bar">
-          <label for="category">🔍 Filter Kategori:</label>
-          <select id="category">
-            <option value="">Semua</option>
-            <option value="Makanan & Minuman">🍔 Makanan & Minuman</option>
-            <option value="Kebersihan">🧴 Kebersihan</option>
-            <option value="Transport">🚌 Transport</option>
-            <option value="Pakaian">👕 Pakaian</option>
-            <option value="Tagihan">⚡ Tagihan</option>
-            <option value="Hiburan">🎮 Hiburan</option>
-            <option value="Lainnya">🎲 Lainnya</option>
-          </select>
-          <button id="applyFilter" class="btn ghost">Terapkan</button>
-        </div>
-
-        <div id="list" class="list"></div>
-      </section>
-
-      <footer>
-        © Suki Finance · v1 · Neobrutalism UI · Waktu (Asia/Jakarta): <span id="footerTime">--</span>
-      </footer>
-    </div>
-
-    <input type="file" id="receiptInput" accept="image/*" style="display:none" />
-    <div id="processingToast" class="toast processing"></div>
-    <div id="toast" class="toast"></div>
-
-      <script>
-        // Theme toggle with persistence
-        (function initTheme() {
-          const saved = localStorage.getItem('theme') || 'light';
-          document.documentElement.setAttribute('data-theme', saved);
-        })();
-
-        function toggleTheme() {
-          const cur = document.documentElement.getAttribute('data-theme') || 'light';
-          const next = cur === 'light' ? 'dark' : 'light';
-          document.documentElement.setAttribute('data-theme', next);
-          localStorage.setItem('theme', next);
-        }
-
-        function updateFooterTime() {
-          const el = document.getElementById('footerTime');
-          if (!el) return;
-          try {
-            const now = new Date();
-            const parts = new Intl.DateTimeFormat('en-GB', {
-              timeZone: 'Asia/Jakarta',
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false
-            }).formatToParts(now);
-            const bag = {};
-            for (const part of parts) {
-              if (part.type !== 'literal') {
-                bag[part.type] = part.value;
-              }
-            }
-            const day = bag.day || '00';
-            const month = bag.month || '00';
-            const year = bag.year || '0000';
-            const hour = bag.hour || '00';
-            const minute = bag.minute || '00';
-            el.textContent = `${day}-${month}-${year} ${hour}:${minute}`;
-          } catch (err) {
-            el.textContent = 'Asia/Jakarta';
-          }
-        }
-
-        updateFooterTime();
-        setInterval(updateFooterTime, 60 * 1000);
-
-        // Daily randomized accents for freshness (optional)
-        (function randomizeAccents() {
-          try {
-            const now = new Date();
-            // Seed by day-of-year
-          const start = new Date(now.getFullYear(), 0, 0);
-          const diff = now - start;
-          const day = Math.floor(diff / (1000 * 60 * 60 * 24));
-          const hue = (day * 37) % 360;
-          const root = document.documentElement;
-          root.style.setProperty('--accent1', `hsl(${hue}, 95%, 65%)`);
-          root.style.setProperty('--accent2', `hsl(${(hue+40)%360}, 95%, 70%)`);
-          root.style.setProperty('--accent3', `hsl(${(hue+80)%360}, 85%, 72%)`);
-          root.style.setProperty('--accent4', `hsl(${(hue+160)%360}, 85%, 70%)`);
-          root.style.setProperty('--accent5', `hsl(${(hue+220)%360}, 85%, 74%)`);
-          root.style.setProperty('--accent6', `hsl(${(hue+280)%360}, 85%, 76%)`);
-        } catch (e) {}
-      })();
-
-      // Utilities
-      function showProcessing(msg) {
-        const el = document.getElementById('processingToast');
-        if (!el) return;
-        el.textContent = msg || 'Sedang memproses...';
-        el.style.display = 'block';
-      }
-
-      function hideProcessing() {
-        const el = document.getElementById('processingToast');
-        if (!el) return;
-        el.style.display = 'none';
-      }
-
-      function showToast(type, msg) {
-        hideProcessing();
-        const el = document.getElementById('toast');
-        el.className = 'toast ' + (type || 'success');
-        el.textContent = msg;
-        el.style.display = 'block';
-        setTimeout(() => { el.style.display = 'none'; }, 2000);
-      }
-
-      function formatRupiah(n) {
-        try {
-          const v = Number(n || 0);
-          return 'Rp ' + v.toLocaleString('id-ID');
-        } catch {
-          return 'Rp ' + (n || 0);
-        }
-      }
-
-      function categoryEmoji(cat, dir) {
-        const d = (dir || '').toLowerCase();
-        if (d === 'masuk') return '💰';
-        if (d === 'keluar') return '💸';
-        const c = (cat || '').toLowerCase();
-        if (c.includes('makanan')) return '🍔';
-        if (c.includes('kebersihan')) return '🧴';
-        if (c.includes('transport')) return '🚌';
-        if (c.includes('pakaian')) return '👕';
-        if (c.includes('tagihan')) return '⚡';
-        if (c.includes('hiburan')) return '🎮';
-        return '🎲';
-      }
-
-      // Backend calls via google.script.run
-
-      function refreshSummary() {
-        if (!google || !google.script || !google.script.run) return;
-        google.script.run
-          .withSuccessHandler((res) => {
-            if (!res || !res.ok) return;
-            document.getElementById('saldoBerjalan').textContent = formatRupiah(res.saldoBerjalan);
-            document.getElementById('pemasukanBulanIni').textContent = formatRupiah(res.pemasukanBulanIni);
-            document.getElementById('pengeluaranBulanIni').textContent = formatRupiah(res.pengeluaranBulanIni);
-            document.getElementById('totalHariIni').textContent = formatRupiah(res.totalHariIni);
-          })
-          .withFailureHandler((err) => {
-            showToast('error', 'Gagal ambil ringkasan');
-          })
-          .getSummary();
-      }
-
-      function refreshList() {
-        const category = document.getElementById('category').value || null;
-        if (!google || !google.script || !google.script.run) return;
-        google.script.run
-          .withSuccessHandler((res) => {
-            const list = document.getElementById('list');
-            list.innerHTML = '';
-            const items = (res && res.items) ? res.items.slice(0, 5) : [];
-            if (!items.length) {
-              list.innerHTML = '<div class="list-item"><div class="emoji">📭</div><div class="meta">Belum ada transaksi</div><div class="amt">—</div></div>';
-              return;
-            }
-            items.forEach((t) => {
-              const itemEl = document.createElement('div');
-              itemEl.className = 'list-item';
-              const emojiEl = document.createElement('div');
-              emojiEl.className = 'emoji';
-              emojiEl.textContent = categoryEmoji(t.category, t.direction);
-              const metaEl = document.createElement('div');
-              metaEl.className = 'meta';
-              metaEl.innerHTML =
-                '<div><strong>' + (t.item || '-') + '</strong></div>' +
-                '<div>' + (t.timestamp || '-') + ' · <em>' + (t.category || '-') + '</em> · ' + (t.direction || '-') + '</div>';
-              const amtEl = document.createElement('div');
-              amtEl.className = 'amt';
-              amtEl.textContent = formatRupiah(t.amount || 0);
-              itemEl.appendChild(emojiEl);
-              itemEl.appendChild(metaEl);
-              itemEl.appendChild(amtEl);
-              list.appendChild(itemEl);
-            });
-          })
-          .withFailureHandler((err) => {
-            showToast('error', 'Gagal ambil transaksi');
-          })
-          .listTransactions(50, category);
-      }
-
-      async function resizeImage(file, maxSize) {
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          const url = URL.createObjectURL(file);
-          img.onload = () => {
-            try {
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-              const width = Math.round(img.width * scale);
-              const height = Math.round(img.height * scale);
-              canvas.width = width;
-              canvas.height = height;
-              ctx.drawImage(img, 0, 0, width, height);
-              canvas.toBlob(
-                (blob) => {
-                  URL.revokeObjectURL(url);
-                  if (!blob) {
-                    reject(new Error('Gagal mengubah gambar'));
-                    return;
-                  }
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    const result = reader.result || '';
-                    const parts = String(result).split(',');
-                    resolve({
-                      base64: parts.length > 1 ? parts[1] : '',
-                      mimeType: blob.type || 'image/jpeg',
-                    });
-                  };
-                  reader.onerror = () => reject(new Error('Gagal membaca gambar'));
-                  reader.readAsDataURL(blob);
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, maximum-scale=1"
+        />
+        <title>📒 Suki Finance Tracker</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <script>
+            window.tailwind = window.tailwind || {};
+            window.tailwind.config = {
+                darkMode: ["class", '[data-theme="dark"]'],
+                theme: {
+                    extend: {
+                        fontFamily: {
+                            display: [
+                                '"Bricolage Grotesque"',
+                                "system-ui",
+                                "-apple-system",
+                                "Segoe UI",
+                                "sans-serif",
+                            ],
+                        },
+                        boxShadow: {
+                            glow: "0 20px 45px -20px rgba(14, 165, 233, 0.45)",
+                        },
+                    },
                 },
-                'image/jpeg',
-                0.82
-              );
-            } catch (err) {
-              URL.revokeObjectURL(url);
-              reject(err);
+            };
+        </script>
+        <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+        <style>
+            :root {
+                --color-bg:
+                    radial-gradient(
+                        circle at 10% 20%,
+                        rgba(224, 242, 254, 0.65),
+                        rgba(248, 250, 252, 0.78)
+                    ),
+                    linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+                --color-card: #ffffff;
+                --color-card-muted: rgba(241, 245, 249, 0.88);
+                --color-border: rgba(15, 23, 42, 0.22);
+                --color-border-strong: rgba(15, 23, 42, 0.48);
+                --color-text: #0f172a;
+                --accent-primary: #6366f1;
+                --accent-secondary: #0ea5e9;
+                --accent-tertiary: #f472b6;
+                --accent-summary-1: linear-gradient(
+                    145deg,
+                    rgba(254, 240, 138, 0.9),
+                    rgba(253, 186, 116, 0.9)
+                );
+                --accent-summary-2: linear-gradient(
+                    145deg,
+                    rgba(187, 247, 208, 0.95),
+                    rgba(134, 239, 172, 0.9)
+                );
+                --accent-summary-3: linear-gradient(
+                    145deg,
+                    rgba(252, 211, 77, 0.92),
+                    rgba(251, 191, 36, 0.9)
+                );
+                --accent-summary-4: linear-gradient(
+                    145deg,
+                    rgba(186, 230, 253, 0.95),
+                    rgba(125, 211, 252, 0.92)
+                );
+                --accent-summary-5: linear-gradient(
+                    145deg,
+                    rgba(233, 213, 255, 0.95),
+                    rgba(196, 181, 253, 0.9)
+                );
+                --shadow-brutal: 8px 12px 0 rgba(15, 23, 42, 0.08);
+                --shadow-floating: 0 20px 50px -30px rgba(14, 165, 233, 0.3);
             }
-          };
-          img.onerror = () => {
-            URL.revokeObjectURL(url);
-            reject(new Error('Gambar tidak bisa dibaca'));
-          };
-          img.src = url;
-        });
-      }
-
-      function submit(direction) {
-        const ta = document.getElementById('rawText');
-        const text = (ta.value || '').trim();
-        if (!text) {
-          showToast('error', 'Teks kosong');
-          ta.focus();
-          return;
-        }
-        showProcessing('Sedang memproses...');
-        google.script.run
-          .withSuccessHandler((res) => {
-            hideProcessing();
-            if (res && res.ok) {
-              showToast('success', 'Tersimpan (' + (res.count || 0) + ')');
-              // Auto-focus + auto-clear input box
-              ta.value = '';
-              ta.focus();
-              refreshSummary();
-              refreshList();
-            } else {
-              hideProcessing();
-              showToast('error', 'Gagal simpan');
+            [data-theme="dark"] {
+                --color-bg:
+                    radial-gradient(
+                        circle at 15% 25%,
+                        rgba(30, 64, 175, 0.35),
+                        rgba(12, 74, 110, 0.45)
+                    ),
+                    linear-gradient(145deg, #020617 0%, #0f172a 100%);
+                --color-card: rgba(15, 23, 42, 0.88);
+                --color-card-muted: rgba(30, 41, 59, 0.75);
+                --color-border: rgba(148, 163, 184, 0.25);
+                --color-border-strong: rgba(226, 232, 240, 0.45);
+                --color-text: #e2e8f0;
+                --accent-primary: #38bdf8;
+                --accent-secondary: #a855f7;
+                --accent-tertiary: #f43f5e;
+                --accent-summary-1: linear-gradient(
+                    145deg,
+                    rgba(202, 138, 4, 0.85),
+                    rgba(249, 115, 22, 0.7)
+                );
+                --accent-summary-2: linear-gradient(
+                    145deg,
+                    rgba(13, 148, 136, 0.85),
+                    rgba(34, 197, 94, 0.72)
+                );
+                --accent-summary-3: linear-gradient(
+                    145deg,
+                    rgba(249, 115, 22, 0.82),
+                    rgba(244, 63, 94, 0.7)
+                );
+                --accent-summary-4: linear-gradient(
+                    145deg,
+                    rgba(14, 165, 233, 0.85),
+                    rgba(56, 189, 248, 0.68)
+                );
+                --accent-summary-5: linear-gradient(
+                    145deg,
+                    rgba(129, 140, 248, 0.8),
+                    rgba(192, 132, 252, 0.65)
+                );
+                --shadow-brutal: 8px 12px 0 rgba(8, 47, 73, 0.45);
+                --shadow-floating: 0 28px 60px -32px rgba(14, 165, 233, 0.45);
             }
-          })
-          .withFailureHandler((err) => {
-            hideProcessing();
-            showToast('error', 'Error: ' + (err && err.message ? err.message : 'unknown'));
-          })
-          .recordTransactions(text, direction);
-      }
+            body {
+                position: relative;
+                min-height: 100vh;
+                background: var(--color-bg);
+                color: var(--color-text);
+                font-family:
+                    "Bricolage Grotesque",
+                    system-ui,
+                    -apple-system,
+                    "Segoe UI",
+                    sans-serif;
+                transition:
+                    background 0.45s ease,
+                    color 0.45s ease;
+                overflow-x: hidden;
+            }
+            body::before {
+                content: "";
+                position: fixed;
+                inset: 0;
+                pointer-events: none;
+                background:
+                    radial-gradient(
+                        circle at 80% 20%,
+                        rgba(244, 114, 182, 0.18),
+                        transparent 45%
+                    ),
+                    radial-gradient(
+                        circle at 10% 80%,
+                        rgba(56, 189, 248, 0.18),
+                        transparent 45%
+                    );
+                opacity: 1;
+                transition: opacity 0.45s ease;
+                z-index: -2;
+            }
+            [data-theme="dark"] body::before {
+                opacity: 0.6;
+            }
+            body::after {
+                content: "";
+                position: fixed;
+                inset: 10% 15%;
+                pointer-events: none;
+                background: linear-gradient(
+                    135deg,
+                    rgba(248, 250, 252, 0.22),
+                    rgba(224, 242, 254, 0.18)
+                );
+                filter: blur(90px);
+                opacity: 0.5;
+                transition: opacity 0.45s ease;
+                z-index: -3;
+            }
+            [data-theme="dark"] body::after {
+                background: linear-gradient(
+                    135deg,
+                    rgba(51, 65, 85, 0.55),
+                    rgba(15, 118, 110, 0.45)
+                );
+                opacity: 0.4;
+            }
+            body.theme-transition,
+            body.theme-transition * {
+                transition:
+                    background-color 0.4s ease,
+                    color 0.4s ease,
+                    border-color 0.4s ease,
+                    box-shadow 0.4s ease !important;
+            }
+            .neo-card {
+                position: relative;
+                background: var(--color-card);
+                border: 1.5px solid var(--color-border);
+                border-radius: 1.5rem;
+                box-shadow: var(--shadow-brutal);
+                transition:
+                    transform 0.2s ease,
+                    box-shadow 0.3s ease,
+                    border-color 0.3s ease,
+                    background 0.4s ease;
+                backdrop-filter: saturate(140%);
+            }
+            .neo-card::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                border-radius: inherit;
+                border: 1px solid rgba(99, 102, 241, 0.08);
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            .neo-card:hover {
+                transform: translateY(-4px);
+                box-shadow: var(--shadow-floating);
+            }
+            .neo-card:hover::after {
+                opacity: 1;
+            }
+            .neo-card-muted {
+                background: var(--color-card-muted);
+            }
+            .neo-button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.55rem;
+                border: 1.5px solid var(--color-border-strong);
+                border-radius: 9999px;
+                padding: 0.68rem 1.2rem;
+                font-weight: 600;
+                box-shadow: var(--shadow-brutal);
+                background: var(--color-card);
+                color: inherit;
+                transition:
+                    transform 0.15s ease,
+                    box-shadow 0.22s ease,
+                    background 0.22s ease,
+                    border-color 0.22s ease;
+            }
+            .neo-button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 20px 40px -26px var(--accent-secondary);
+                border-color: rgba(99, 102, 241, 0.4);
+            }
+            .neo-button:active {
+                transform: translateY(0);
+                box-shadow: var(--shadow-brutal);
+            }
+            .neo-button.primary {
+                background: linear-gradient(
+                    135deg,
+                    var(--accent-primary),
+                    var(--accent-secondary)
+                );
+                color: #f8fafc;
+            }
+            .neo-button.secondary {
+                background: linear-gradient(
+                    135deg,
+                    #fb7185,
+                    var(--accent-tertiary)
+                );
+                color: #fff;
+            }
+            .neo-button.ghost {
+                background: rgba(255, 255, 255, 0.72);
+            }
+            [data-theme="dark"] .neo-button.ghost {
+                background: rgba(15, 23, 42, 0.9);
+            }
+            .neo-input {
+                width: 100%;
+                border: 1.5px solid var(--color-border-strong);
+                border-radius: 1.2rem;
+                padding: 1rem;
+                background: rgba(255, 255, 255, 0.92);
+                color: inherit;
+                min-height: 8.5rem;
+                font-size: 1rem;
+                font-weight: 500;
+                resize: vertical;
+                box-shadow: var(--shadow-brutal);
+                transition:
+                    border-color 0.22s ease,
+                    box-shadow 0.25s ease,
+                    background 0.3s ease;
+            }
+            [data-theme="dark"] .neo-input {
+                background: rgba(15, 23, 42, 0.85);
+            }
+            .neo-input:focus {
+                outline: none;
+                border-color: rgba(14, 165, 233, 0.6);
+                box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.14);
+            }
+            .neo-select {
+                border: 1.5px solid var(--color-border-strong);
+                border-radius: 9999px;
+                padding: 0.65rem 1.1rem;
+                background: rgba(255, 255, 255, 0.9);
+                color: inherit;
+                font-weight: 600;
+                box-shadow: var(--shadow-brutal);
+                cursor: pointer;
+                appearance: none;
+                transition:
+                    border-color 0.22s ease,
+                    box-shadow 0.22s ease,
+                    background 0.3s ease;
+            }
+            [data-theme="dark"] .neo-select {
+                background: rgba(15, 23, 42, 0.85);
+            }
+            .neo-select:focus {
+                outline: none;
+                border-color: rgba(99, 102, 241, 0.58);
+            }
+            .summary-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 1.1rem;
+            }
+            .summary-tile {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                border-radius: 1.4rem;
+                padding: 1.4rem;
+                color: #0f172a;
+                box-shadow: var(--shadow-brutal);
+                overflow: hidden;
+            }
+            .summary-tile span:last-child {
+                font-size: 1.1rem;
+            }
+            .summary-tile::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                border-radius: inherit;
+                border: 1px solid rgba(255, 255, 255, 0.35);
+                mix-blend-mode: overlay;
+                pointer-events: none;
+            }
+            .summary-tile--saldo {
+                background: var(--accent-summary-1);
+            }
+            .summary-tile--masuk-bulan {
+                background: var(--accent-summary-2);
+            }
+            .summary-tile--keluar-bulan {
+                background: var(--accent-summary-3);
+            }
+            .summary-tile--masuk-hari {
+                background: var(--accent-summary-4);
+            }
+            .summary-tile--keluar-hari {
+                background: var(--accent-summary-5);
+            }
+            .summary-tile--total {
+                background: linear-gradient(
+                    145deg,
+                    rgba(248, 250, 252, 0.94),
+                    rgba(224, 242, 254, 0.88)
+                );
+            }
+            [data-theme="dark"] .summary-tile {
+                color: #f8fafc;
+            }
+            .transaction-list {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .transaction-item {
+                display: grid;
+                grid-template-columns: 3rem 1fr auto;
+                align-items: center;
+                gap: 1rem;
+                border: 1.5px solid var(--color-border);
+                border-radius: 1.35rem;
+                background: rgba(255, 255, 255, 0.92);
+                box-shadow: var(--shadow-brutal);
+                padding: 1.05rem;
+                transition:
+                    border-color 0.25s ease,
+                    transform 0.22s ease,
+                    box-shadow 0.22s ease,
+                    background 0.3s ease;
+            }
+            [data-theme="dark"] .transaction-item {
+                background: rgba(15, 23, 42, 0.85);
+            }
+            .transaction-item:hover {
+                transform: translateX(4px);
+                border-color: rgba(99, 102, 241, 0.42);
+                box-shadow: 0 16px 42px -24px rgba(99, 102, 241, 0.45);
+            }
+            .transaction-emoji {
+                display: grid;
+                place-items: center;
+                font-size: 1.75rem;
+                border: 1.5px solid var(--color-border);
+                border-radius: 1.1rem;
+                background: rgba(255, 255, 255, 0.8);
+                box-shadow: var(--shadow-brutal);
+                transition:
+                    background 0.3s ease,
+                    border-color 0.3s ease;
+            }
+            [data-theme="dark"] .transaction-emoji {
+                background: rgba(15, 23, 42, 0.85);
+            }
+            .transaction-meta {
+                display: flex;
+                flex-direction: column;
+                gap: 0.3rem;
+                font-size: 0.9rem;
+            }
+            .transaction-meta-title {
+                font-size: 1.02rem;
+                font-weight: 600;
+            }
+            .transaction-meta-sub {
+                font-size: 0.78rem;
+                color: rgba(15, 23, 42, 0.67);
+            }
+            [data-theme="dark"] .transaction-meta-sub {
+                color: rgba(226, 232, 240, 0.78);
+            }
+            .transaction-amount {
+                font-size: 1.05rem;
+                font-weight: 700;
+            }
+            .toast {
+                position: fixed;
+                right: 1.5rem;
+                bottom: 1.5rem;
+                z-index: 50;
+                min-width: 230px;
+                padding: 0.9rem 1.1rem;
+                border-radius: 1.1rem;
+                border: 1.5px solid var(--color-border-strong);
+                box-shadow: var(--shadow-floating);
+                background: rgba(255, 255, 255, 0.92);
+                color: var(--color-text);
+                font-weight: 600;
+                display: none;
+                backdrop-filter: blur(8px) saturate(160%);
+            }
+            [data-theme="dark"] .toast {
+                background: rgba(15, 23, 42, 0.9);
+            }
+            .toast.success {
+                border-color: rgba(34, 197, 94, 0.6);
+                background: rgba(220, 252, 231, 0.92);
+                color: #166534;
+            }
+            .toast.error {
+                border-color: rgba(239, 68, 68, 0.6);
+                background: rgba(254, 226, 226, 0.9);
+                color: #991b1b;
+            }
+            .toast.processing {
+                border-color: rgba(14, 165, 233, 0.5);
+                background: rgba(224, 242, 254, 0.9);
+                color: #075985;
+            }
+            [data-theme="dark"] .toast.success {
+                color: #bbf7d0;
+            }
+            [data-theme="dark"] .toast.error {
+                color: #fecdd3;
+            }
+            [data-theme="dark"] .toast.processing {
+                color: #bae6fd;
+            }
+            @media (max-width: 900px) {
+                .transaction-item {
+                    grid-template-columns: 2.5rem 1fr;
+                    grid-template-areas:
+                        "emoji title"
+                        "emoji subtitle"
+                        "amount amount";
+                    gap: 0.75rem;
+                }
+                .transaction-emoji {
+                    grid-area: emoji;
+                }
+                .transaction-meta {
+                    grid-area: title;
+                }
+                .transaction-amount {
+                    grid-area: amount;
+                    justify-self: flex-start;
+                }
+            }
+            @media (max-width: 640px) {
+                .neo-card {
+                    padding: 1.25rem !important;
+                }
+                .summary-grid {
+                    grid-template-columns: repeat(
+                        auto-fill,
+                        minmax(180px, 1fr)
+                    );
+                }
+                .neo-button {
+                    width: 100%;
+                    justify-content: center;
+                }
+            }
+        </style>
+    </head>
+    <body class="min-h-screen antialiased">
+        <div class="px-4 py-8 sm:px-6 lg:px-8">
+            <div class="mx-auto flex max-w-5xl flex-col gap-6">
+                <header
+                    class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+                >
+                    <div
+                        class="neo-card neo-card-muted relative inline-flex w-full flex-col gap-4 overflow-hidden rounded-2xl px-5 py-5 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <span
+                            class="pointer-events-none absolute -top-32 right-0 h-56 w-56 rounded-full bg-gradient-to-br from-indigo-300/50 via-sky-200/45 to-transparent blur-3xl"
+                        ></span>
+                        <span
+                            class="pointer-events-none absolute bottom-[-70px] left-[-40px] h-60 w-60 rounded-full bg-gradient-to-tr from-rose-200/55 via-purple-200/40 to-transparent blur-3xl"
+                        ></span>
+                        <div class="relative flex items-center gap-3">
+                            <span class="text-3xl">📒</span>
+                            <div>
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500 dark:text-slate-300"
+                                >
+                                    Suki Finance
+                                </p>
+                                <h1
+                                    class="text-2xl font-semibold text-slate-900 dark:text-slate-50"
+                                >
+                                    Tracker Keuangan Harian
+                                </h1>
+                                <div
+                                    class="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold"
+                                >
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-full bg-white/70 px-3 py-1 text-slate-600 ring-1 ring-inset ring-slate-200 backdrop-blur dark:bg-slate-900/40 dark:text-slate-200 dark:ring-slate-700"
+                                    >
+                                        <span
+                                            class="h-1.5 w-1.5 rounded-full bg-emerald-500"
+                                        ></span>
+                                        Realtime Sync
+                                    </span>
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-full bg-white/70 px-3 py-1 text-slate-600 ring-1 ring-inset ring-slate-200 backdrop-blur dark:bg-slate-900/40 dark:text-slate-200 dark:ring-slate-700"
+                                    >
+                                        ✨ Insight Otomatis
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="relative max-w-sm text-sm font-medium text-slate-500 dark:text-slate-200"
+                        >
+                            Catat transaksi sehari-hari, nikmati rekap yang
+                            rapi, dan rasakan tampilan yang menyesuaikan tema
+                            favoritmu.
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button
+                            id="themeToggle"
+                            type="button"
+                            class="neo-button ghost"
+                        >
+                            <span id="themeToggleIcon" class="text-lg">🌙</span>
+                            <span class="text-sm">Ganti Tema</span>
+                        </button>
+                        <button
+                            id="refreshBtn"
+                            type="button"
+                            class="neo-button ghost"
+                        >
+                            <span>🔄</span>
+                            <span class="text-sm">Refresh Data</span>
+                        </button>
+                        <a
+                            class="neo-button primary"
+                            href="https://docs.google.com/spreadsheets/d/1LnkXgFHzL9nhVO9Sz0vgEEucuV3J8F2c-o36JoCSc6o/"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            📄 Google Sheet
+                        </a>
+                    </div>
+                </header>
 
-      // Receipt upload helpers
-      let pendingReceiptDirection = null;
+                <div class="grid gap-6 lg:grid-cols-2">
+                    <section
+                        class="neo-card relative space-y-6 overflow-hidden p-6"
+                    >
+                        <span
+                            class="pointer-events-none absolute -right-24 top-12 h-48 w-48 rounded-full bg-gradient-to-br from-emerald-200/45 via-sky-200/35 to-transparent blur-3xl"
+                        ></span>
+                        <div class="space-y-2">
+                            <h2 class="text-lg font-semibold">
+                                📝 Input Teks Natural
+                            </h2>
+                            <p
+                                class="text-sm text-slate-600 dark:text-slate-300"
+                            >
+                                Contoh:
+                                <strong>keluar kopi 16rb, sabun 10rb</strong>
+                                atau <strong>masuk gaji 10jt</strong>
+                            </p>
+                        </div>
+                        <textarea
+                            id="rawText"
+                            class="neo-input"
+                            placeholder="Tulis transaksi di sini..."
+                        ></textarea>
+                        <div class="flex flex-wrap gap-3">
+                            <button
+                                id="btnKeluar"
+                                type="button"
+                                class="neo-button secondary"
+                            >
+                                💸 Catat Pengeluaran
+                            </button>
+                            <button
+                                id="btnMasuk"
+                                type="button"
+                                class="neo-button primary"
+                            >
+                                💰 Catat Pemasukan
+                            </button>
+                            <button
+                                id="btnClear"
+                                type="button"
+                                class="neo-button ghost"
+                            >
+                                🧽 Bersihkan
+                            </button>
+                        </div>
+                        <hr
+                            class="border-dashed border-slate-300 dark:border-slate-600"
+                        />
+                        <div class="space-y-2">
+                            <h2 class="text-lg font-semibold">
+                                📷 Upload Struk
+                            </h2>
+                            <p
+                                class="text-sm text-slate-600 dark:text-slate-300"
+                            >
+                                Foto struk akan diperkecil &amp; dibaca
+                                otomatis. Setiap item akan menjadi baris
+                                terpisah di sheet.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <button
+                                id="btnUploadKeluar"
+                                type="button"
+                                class="neo-button secondary"
+                            >
+                                📸 Struk Pengeluaran
+                            </button>
+                            <button
+                                id="btnUploadMasuk"
+                                type="button"
+                                class="neo-button primary"
+                            >
+                                📸 Struk Pemasukan
+                            </button>
+                            <span
+                                id="receiptStatus"
+                                class="text-sm font-semibold text-sky-600"
+                                style="display: none"
+                            ></span>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            Tips: Foto tegak lurus, pastikan teks terbaca. File
+                            &lt; 8MB akan otomatis diperkecil hingga 1200px.
+                        </p>
+                    </section>
+                    <section
+                        class="neo-card relative space-y-4 overflow-hidden p-6"
+                    >
+                        <span
+                            class="pointer-events-none absolute -left-28 top-[-40px] h-56 w-56 rounded-full bg-gradient-to-br from-sky-200/55 via-indigo-200/40 to-transparent blur-3xl"
+                        ></span>
+                        <div>
+                            <h2 class="text-lg font-semibold">📊 Ringkasan</h2>
+                            <p
+                                class="mt-1 text-sm text-slate-600 dark:text-slate-300"
+                            >
+                                Sinkron otomatis dengan data Google Sheet.
+                            </p>
+                        </div>
+                        <div class="summary-grid">
+                            <div class="summary-tile summary-tile--saldo">
+                                <span
+                                    class="text-sm font-semibold uppercase tracking-wide text-slate-700"
+                                    >Saldo Berjalan</span
+                                >
+                                <span
+                                    id="saldoBerjalan"
+                                    class="text-xl font-bold"
+                                    >Rp 0</span
+                                >
+                            </div>
+                            <div class="summary-tile summary-tile--masuk-bulan">
+                                <span
+                                    class="text-sm font-semibold uppercase tracking-wide text-slate-700"
+                                    >Pemasukan Bulan Ini</span
+                                >
+                                <span
+                                    id="pemasukanBulanIni"
+                                    class="text-xl font-bold"
+                                    >Rp 0</span
+                                >
+                            </div>
+                            <div
+                                class="summary-tile summary-tile--keluar-bulan"
+                            >
+                                <span
+                                    class="text-sm font-semibold uppercase tracking-wide text-slate-700"
+                                    >Pengeluaran Bulan Ini</span
+                                >
+                                <span
+                                    id="pengeluaranBulanIni"
+                                    class="text-xl font-bold"
+                                    >Rp 0</span
+                                >
+                            </div>
+                            <div class="summary-tile summary-tile--masuk-hari">
+                                <span
+                                    class="text-sm font-semibold uppercase tracking-wide text-slate-700"
+                                    >Pemasukan Hari Ini</span
+                                >
+                                <span
+                                    id="pemasukanHariIni"
+                                    class="text-xl font-bold"
+                                    >Rp 0</span
+                                >
+                            </div>
+                            <div class="summary-tile summary-tile--keluar-hari">
+                                <span
+                                    class="text-sm font-semibold uppercase tracking-wide text-slate-700"
+                                    >Pengeluaran Hari Ini</span
+                                >
+                                <span
+                                    id="pengeluaranHariIni"
+                                    class="text-xl font-bold"
+                                    >Rp 0</span
+                                >
+                            </div>
+                            <div class="summary-tile summary-tile--total">
+                                <span
+                                    class="text-sm font-semibold uppercase tracking-wide text-slate-700"
+                                    >Total Aktivitas Hari Ini</span
+                                >
+                                <span
+                                    id="totalHariIni"
+                                    class="text-xl font-bold"
+                                    >Rp 0</span
+                                >
+                            </div>
+                        </div>
+                    </section>
+                </div>
+                <section
+                    class="neo-card relative space-y-5 overflow-hidden p-6"
+                >
+                    <span
+                        class="pointer-events-none absolute -right-16 top-[-60px] h-60 w-60 rounded-full bg-gradient-to-br from-indigo-200/55 via-rose-200/45 to-transparent blur-3xl"
+                    ></span>
+                    <div
+                        class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"
+                    >
+                        <div>
+                            <h2 class="text-lg font-semibold">
+                                📋 Daftar Transaksi
+                            </h2>
+                            <p
+                                class="text-sm text-slate-600 dark:text-slate-300"
+                            >
+                                Menampilkan 5 transaksi terbaru sesuai filter.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <label
+                                for="category"
+                                class="text-sm font-semibold text-slate-600 dark:text-slate-300"
+                                >Filter Kategori</label
+                            >
+                            <select id="category" class="neo-select text-sm">
+                                <option value="">Semua</option>
+                                <option value="Makanan &amp; Minuman">
+                                    🍔 Makanan &amp; Minuman
+                                </option>
+                                <option value="Kebersihan">
+                                    🧴 Kebersihan
+                                </option>
+                                <option value="Transport">🚌 Transport</option>
+                                <option value="Pakaian">👕 Pakaian</option>
+                                <option value="Tagihan">⚡ Tagihan</option>
+                                <option value="Hiburan">🎮 Hiburan</option>
+                                <option value="Lainnya">🎲 Lainnya</option>
+                            </select>
+                            <button
+                                id="applyFilter"
+                                type="button"
+                                class="neo-button ghost text-sm"
+                            >
+                                Terapkan
+                            </button>
+                        </div>
+                    </div>
+                    <div id="list" class="transaction-list"></div>
+                </section>
 
-      function setReceiptStatus(text) {
-        const el = document.getElementById('receiptStatus');
-        if (!el) return;
-        if (text) {
-          el.textContent = text;
-          el.style.display = 'inline-flex';
-        } else {
-          el.textContent = '';
-          el.style.display = 'none';
-        }
-      }
+                <footer
+                    class="pb-8 text-center text-xs font-medium text-slate-500 dark:text-slate-400"
+                >
+                    © Suki Finance · v2
+                </footer>
+            </div>
+        </div>
 
-      function requestReceiptUpload(direction) {
-        const input = document.getElementById('receiptInput');
-        pendingReceiptDirection = direction;
-        if (!input) {
-          showToast('error', 'Input tidak tersedia');
-          return;
-        }
-        input.value = '';
-        input.click();
-        setReceiptStatus('');
-      }
+        <input
+            type="file"
+            id="receiptInput"
+            accept="image/*"
+            style="display: none"
+        />
+        <div id="processingToast" class="toast processing"></div>
+        <div id="toast" class="toast"></div>
 
-      async function handleReceiptChange(event) {
-        const file = event?.target?.files?.[0] || null;
-        if (!file) return;
-        if (!pendingReceiptDirection) {
-          showToast('error', 'Pilih jenis transaksi terlebih dahulu');
-          setReceiptStatus('');
-          return;
-        }
-        if (!file.type.startsWith('image/')) {
-          showToast('error', 'File harus berupa gambar');
-          setReceiptStatus('');
-          return;
-        }
-        if (file.size > 8 * 1024 * 1024) {
-          showToast('error', 'Ukuran maks 8MB');
-          setReceiptStatus('');
-          return;
-        }
-        try {
-          setReceiptStatus('Tunggu bentar ya, lagi aku rapiin fotonya… ✨');
-          showProcessing('Sebentar, lagi rapiin struk…');
-          const resized = await resizeImage(file, 1200);
-          if (!resized.base64) {
-            showToast('error', 'Gagal kompres gambar');
-            setReceiptStatus('');
-            return;
-          }
-          setReceiptStatus('Sabar ya, lagi kupilah itemnya biar kinclong! 💪');
-          showProcessing('Lagi baca strukmu, tunggu sebentar ya…');
-          google.script.run
-            .withSuccessHandler((res) => {
-              hideProcessing();
-              pendingReceiptDirection = null;
-              if (res && res.ok) {
-                setReceiptStatus('');
-                showToast('success', 'Struk tersimpan (' + (res.count || 0) + ')');
-                refreshSummary();
-                refreshList();
-              } else {
-                setReceiptStatus('');
-                showToast('error', (res && res.error) ? res.error : 'Gagal memproses struk');
-              }
-            })
-            .withFailureHandler((err) => {
-              hideProcessing();
-              pendingReceiptDirection = null;
-              setReceiptStatus('');
-              showToast('error', 'Error: ' + (err && err.message ? err.message : 'unknown'));
-            })
-            .processReceiptUpload({
-              direction: pendingReceiptDirection,
-              imageBase64: resized.base64,
-              mimeType: resized.mimeType,
-              fileName: file.name || 'receipt.jpg',
-              originalSize: file.size,
-            });
-        } catch (err) {
-          hideProcessing();
-          pendingReceiptDirection = null;
-          setReceiptStatus('');
-          showToast('error', err && err.message ? err.message : 'Gagal memproses struk');
-        }
-      }
+        <script>
+            const THEME_STORAGE_KEY = "suki-theme";
+            const docEl = document.documentElement;
 
-      // Wire UI
-      document.getElementById('btnKeluar')?.addEventListener('click', () => submit('keluar'));
-      document.getElementById('btnMasuk')?.addEventListener('click', () => submit('masuk'));
-      document.getElementById('btnClear')?.addEventListener('click', () => { document.getElementById('rawText').value = ''; });
-      document.getElementById('applyFilter')?.addEventListener('click', () => refreshList());
-      document.getElementById('refreshBtn')?.addEventListener('click', () => { refreshSummary(); refreshList(); });
-      document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
-      document.getElementById('btnUploadKeluar')?.addEventListener('click', () => requestReceiptUpload('keluar'));
-      document.getElementById('btnUploadMasuk')?.addEventListener('click', () => requestReceiptUpload('masuk'));
-      document.getElementById('receiptInput')?.addEventListener('change', handleReceiptChange);
+            function getThemeToggleIcon() {
+                return document.getElementById("themeToggleIcon");
+            }
 
-      // Initial load
-      refreshSummary();
-      refreshList();
+            function applyTheme(theme) {
+                const next = theme === "dark" ? "dark" : "light";
+                docEl.setAttribute("data-theme", next);
+                localStorage.setItem(THEME_STORAGE_KEY, next);
+                const icon = getThemeToggleIcon();
+                if (icon) {
+                    icon.textContent = next === "dark" ? "☀️" : "🌙";
+                }
+                const body = document.body;
+                if (body) {
+                    body.classList.add("theme-transition");
+                    window.clearTimeout(applyTheme._timer);
+                    applyTheme._timer = window.setTimeout(() => {
+                        body.classList.remove("theme-transition");
+                    }, 480);
+                }
+            }
 
-      /**
-       * Clickable references:
-       * - [`function refreshSummary()`](index.html:367)
-       * - [`function refreshList()`](index.html:383)
-       * - [`function submit()`](index.html:421)
-       * - [`index.html`](index.html)
-       */
-    </script>
-  </body>
+            (function initTheme() {
+                const saved =
+                    localStorage.getItem(THEME_STORAGE_KEY) || "light";
+                applyTheme(saved);
+            })();
+
+            function toggleTheme() {
+                const cur = docEl.getAttribute("data-theme") || "light";
+                applyTheme(cur === "light" ? "dark" : "light");
+            }
+
+            function updateFooterTime() {
+                const el = document.getElementById("footerTime");
+                if (!el) return;
+                try {
+                    const now = new Date();
+                    const parts = new Intl.DateTimeFormat("id-ID", {
+                        timeZone: "Asia/Jakarta",
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                    }).formatToParts(now);
+                    const map = {};
+                    for (const part of parts) {
+                        if (part.type !== "literal") {
+                            map[part.type] = part.value;
+                        }
+                    }
+                    el.textContent = `${map.day || "00"}-${map.month || "00"}-${map.year || "0000"} ${map.hour || "00"}:${map.minute || "00"}`;
+                } catch (err) {
+                    el.textContent = "Asia/Jakarta";
+                }
+            }
+
+            updateFooterTime();
+            setInterval(updateFooterTime, 60 * 1000);
+
+            (function randomizeAccents() {
+                try {
+                    const now = new Date();
+                    const start = new Date(now.getFullYear(), 0, 0);
+                    const diff = now - start;
+                    const day = Math.floor(diff / (1000 * 60 * 60 * 24));
+                    const hue = (day * 37) % 360;
+                    const gradient = (offset, saturation, lightness) => {
+                        const startHue = (hue + offset) % 360;
+                        const endHue = (hue + offset + 14) % 360;
+                        const endLight = Math.min(lightness + 8, 92);
+                        return `linear-gradient(145deg, hsl(${startHue}, ${saturation}%, ${lightness}%), hsl(${endHue}, ${saturation}%, ${endLight}%))`;
+                    };
+                    docEl.style.setProperty(
+                        "--accent-summary-1",
+                        gradient(0, 90, 70),
+                    );
+                    docEl.style.setProperty(
+                        "--accent-summary-2",
+                        gradient(60, 86, 72),
+                    );
+                    docEl.style.setProperty(
+                        "--accent-summary-3",
+                        gradient(120, 84, 68),
+                    );
+                    docEl.style.setProperty(
+                        "--accent-summary-4",
+                        gradient(180, 82, 72),
+                    );
+                    docEl.style.setProperty(
+                        "--accent-summary-5",
+                        gradient(240, 80, 70),
+                    );
+                } catch (err) {
+                    // ignore if accents cannot be randomized
+                }
+            })();
+
+            function showProcessing(msg) {
+                const el = document.getElementById("processingToast");
+                if (!el) return;
+                el.textContent = msg || "Sedang memproses...";
+                el.style.display = "block";
+            }
+
+            function hideProcessing() {
+                const el = document.getElementById("processingToast");
+                if (!el) return;
+                el.style.display = "none";
+            }
+
+            function showToast(type, msg) {
+                hideProcessing();
+                const el = document.getElementById("toast");
+                if (!el) return;
+                el.className = "toast " + (type || "success");
+                el.textContent = msg;
+                el.style.display = "block";
+                setTimeout(() => {
+                    el.style.display = "none";
+                }, 2800);
+            }
+
+            function formatRupiah(n) {
+                const value = Number(n || 0);
+                if (!Number.isFinite(value)) return "Rp 0";
+                return "Rp " + value.toLocaleString("id-ID");
+            }
+
+            function categoryEmoji(cat, direction) {
+                const dir = (direction || "").toLowerCase();
+                if (dir === "masuk") return "💰";
+                if (dir === "keluar") return "💸";
+                const label = (cat || "").toLowerCase();
+                if (label.includes("makanan")) return "🍔";
+                if (label.includes("kebersihan")) return "🧴";
+                if (label.includes("transport")) return "🚌";
+                if (label.includes("pakaian")) return "👕";
+                if (label.includes("tagihan")) return "⚡";
+                if (label.includes("hiburan")) return "🎮";
+                return "🎲";
+            }
+
+            function refreshSummary() {
+                if (!google?.script?.run) return;
+                google.script.run
+                    .withSuccessHandler((res) => {
+                        if (!res || !res.ok) return;
+                        const map = {
+                            saldoBerjalan: "saldoBerjalan",
+                            pemasukanBulanIni: "pemasukanBulanIni",
+                            pengeluaranBulanIni: "pengeluaranBulanIni",
+                            pemasukanHariIni: "pemasukanHariIni",
+                            pengeluaranHariIni: "pengeluaranHariIni",
+                            totalHariIni: "totalHariIni",
+                        };
+                        Object.entries(map).forEach(([key, id]) => {
+                            if (!(key in res)) return;
+                            const el = document.getElementById(id);
+                            if (el) {
+                                el.textContent = formatRupiah(res[key]);
+                            }
+                        });
+                    })
+                    .withFailureHandler(() => {
+                        showToast("error", "Gagal mengambil ringkasan");
+                    })
+                    .getSummary();
+            }
+
+            function buildEmptyState() {
+                const wrapper = document.createElement("div");
+                wrapper.className = "transaction-item";
+                const emoji = document.createElement("div");
+                emoji.className = "transaction-emoji";
+                emoji.textContent = "📭";
+                const meta = document.createElement("div");
+                meta.className = "transaction-meta";
+                const title = document.createElement("span");
+                title.className = "transaction-meta-title";
+                title.textContent = "Belum ada transaksi untuk filter ini.";
+                const sub = document.createElement("span");
+                sub.className = "transaction-meta-sub";
+                sub.textContent = "Transaksi terbaru akan tampil di sini.";
+                meta.appendChild(title);
+                meta.appendChild(sub);
+                const amount = document.createElement("div");
+                amount.className = "transaction-amount";
+                amount.textContent = "--";
+                wrapper.appendChild(emoji);
+                wrapper.appendChild(meta);
+                wrapper.appendChild(amount);
+                return wrapper;
+            }
+
+            function refreshList() {
+                const category =
+                    document.getElementById("category")?.value || "";
+                if (!google?.script?.run) return;
+                google.script.run
+                    .withSuccessHandler((res) => {
+                        const container = document.getElementById("list");
+                        if (!container) return;
+                        container.innerHTML = "";
+                        const items = (res && res.items ? res.items : []).slice(
+                            0,
+                            5,
+                        );
+                        if (!items.length) {
+                            container.appendChild(buildEmptyState());
+                            return;
+                        }
+                        items.forEach((item) => {
+                            const card = document.createElement("div");
+                            card.className = "transaction-item";
+
+                            const emoji = document.createElement("div");
+                            emoji.className = "transaction-emoji";
+                            emoji.textContent = categoryEmoji(
+                                item.category,
+                                item.direction,
+                            );
+
+                            const meta = document.createElement("div");
+                            meta.className = "transaction-meta";
+                            const title = document.createElement("span");
+                            title.className = "transaction-meta-title";
+                            title.textContent = item.item || "-";
+                            const subtitle = document.createElement("span");
+                            subtitle.className = "transaction-meta-sub";
+                            subtitle.innerHTML = `${item.timestamp || "-"} · <em>${item.category || "Tanpa kategori"}</em> · ${item.direction || "-"}`;
+                            meta.appendChild(title);
+                            meta.appendChild(subtitle);
+
+                            const amount = document.createElement("div");
+                            amount.className = "transaction-amount";
+                            amount.textContent = formatRupiah(item.amount || 0);
+
+                            card.appendChild(emoji);
+                            card.appendChild(meta);
+                            card.appendChild(amount);
+                            container.appendChild(card);
+                        });
+                    })
+                    .withFailureHandler(() => {
+                        showToast("error", "Gagal mengambil transaksi");
+                    })
+                    .listTransactions(50, category);
+            }
+
+            async function resizeImage(file, maxSize) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    const url = URL.createObjectURL(file);
+                    img.onload = () => {
+                        URL.revokeObjectURL(url);
+                        try {
+                            const canvas = document.createElement("canvas");
+                            const ctx = canvas.getContext("2d");
+                            const scale = Math.min(
+                                1,
+                                maxSize / Math.max(img.width, img.height),
+                            );
+                            const width = Math.round(img.width * scale);
+                            const height = Math.round(img.height * scale);
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.drawImage(img, 0, 0, width, height);
+                            canvas.toBlob(
+                                (blob) => {
+                                    if (!blob) {
+                                        reject(
+                                            new Error(
+                                                "Gagal mengonversi gambar",
+                                            ),
+                                        );
+                                        return;
+                                    }
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                        const result = String(
+                                            reader.result || "",
+                                        );
+                                        const parts = result.split(",");
+                                        resolve({
+                                            base64:
+                                                parts.length > 1
+                                                    ? parts[1]
+                                                    : "",
+                                            mimeType: blob.type || "image/jpeg",
+                                        });
+                                    };
+                                    reader.onerror = () =>
+                                        reject(
+                                            new Error("Gagal membaca gambar"),
+                                        );
+                                    reader.readAsDataURL(blob);
+                                },
+                                "image/jpeg",
+                                0.82,
+                            );
+                        } catch (err) {
+                            reject(err);
+                        }
+                    };
+                    img.onerror = () => {
+                        URL.revokeObjectURL(url);
+                        reject(new Error("Gambar tidak dapat dibaca"));
+                    };
+                    img.src = url;
+                });
+            }
+
+            function submit(direction) {
+                const input = document.getElementById("rawText");
+                const text = (input?.value || "").trim();
+                if (!text) {
+                    showToast("error", "Teks masih kosong");
+                    input?.focus();
+                    return;
+                }
+                showProcessing("Sedang mencatat transaksi...");
+                google.script.run
+                    .withSuccessHandler((res) => {
+                        hideProcessing();
+                        if (res && res.ok) {
+                            showToast(
+                                "success",
+                                `Tersimpan (${res.count || 0} item)`,
+                            );
+                            if (input) {
+                                input.value = "";
+                                input.focus();
+                            }
+                            refreshSummary();
+                            refreshList();
+                        } else {
+                            showToast("error", "Gagal menyimpan transaksi");
+                        }
+                    })
+                    .withFailureHandler((err) => {
+                        hideProcessing();
+                        showToast(
+                            "error",
+                            "Error: " +
+                                (err && err.message ? err.message : "unknown"),
+                        );
+                    })
+                    .recordTransactions(text, direction);
+            }
+
+            let pendingReceiptDirection = null;
+
+            function setReceiptStatus(text) {
+                const el = document.getElementById("receiptStatus");
+                if (!el) return;
+                if (text) {
+                    el.textContent = text;
+                    el.style.display = "inline-flex";
+                } else {
+                    el.textContent = "";
+                    el.style.display = "none";
+                }
+            }
+
+            function requestReceiptUpload(direction) {
+                const input = document.getElementById("receiptInput");
+                pendingReceiptDirection = direction;
+                if (!input) {
+                    showToast("error", "Input tidak tersedia");
+                    return;
+                }
+                input.value = "";
+                setReceiptStatus("");
+                input.click();
+            }
+
+            async function handleReceiptChange(event) {
+                const file = event?.target?.files?.[0] || null;
+                if (!file) return;
+                if (!pendingReceiptDirection) {
+                    showToast("error", "Pilih jenis transaksi terlebih dahulu");
+                    setReceiptStatus("");
+                    return;
+                }
+                if (!file.type.startsWith("image/")) {
+                    showToast("error", "File harus berupa gambar");
+                    setReceiptStatus("");
+                    return;
+                }
+                if (file.size > 8 * 1024 * 1024) {
+                    showToast("error", "Ukuran maksimal 8MB");
+                    setReceiptStatus("");
+                    return;
+                }
+                try {
+                    setReceiptStatus("Sedang merapikan fotonya...");
+                    showProcessing("Mengoptimalkan gambar struk...");
+                    const resized = await resizeImage(file, 1200);
+                    if (!resized.base64) {
+                        throw new Error("Gagal mengompres gambar");
+                    }
+                    setReceiptStatus("Membaca item di struk...");
+                    showProcessing("Membaca struk, mohon tunggu...");
+                    google.script.run
+                        .withSuccessHandler((res) => {
+                            hideProcessing();
+                            if (res && res.ok) {
+                                setReceiptStatus("");
+                                showToast(
+                                    "success",
+                                    `Struk tersimpan (${res.count || 0} item)`,
+                                );
+                                refreshSummary();
+                                refreshList();
+                            } else {
+                                setReceiptStatus("");
+                                showToast(
+                                    "error",
+                                    res && res.error
+                                        ? res.error
+                                        : "Gagal memproses struk",
+                                );
+                            }
+                            pendingReceiptDirection = null;
+                        })
+                        .withFailureHandler((err) => {
+                            hideProcessing();
+                            pendingReceiptDirection = null;
+                            setReceiptStatus("");
+                            showToast(
+                                "error",
+                                "Error: " +
+                                    (err && err.message
+                                        ? err.message
+                                        : "unknown"),
+                            );
+                        })
+                        .processReceiptUpload({
+                            direction: pendingReceiptDirection,
+                            imageBase64: resized.base64,
+                            mimeType: resized.mimeType,
+                            fileName: file.name || "receipt.jpg",
+                            originalSize: file.size,
+                        });
+                } catch (err) {
+                    hideProcessing();
+                    pendingReceiptDirection = null;
+                    setReceiptStatus("");
+                    showToast(
+                        "error",
+                        err && err.message
+                            ? err.message
+                            : "Gagal memproses struk",
+                    );
+                }
+            }
+
+            document
+                .getElementById("btnKeluar")
+                ?.addEventListener("click", () => submit("keluar"));
+            document
+                .getElementById("btnMasuk")
+                ?.addEventListener("click", () => submit("masuk"));
+            document
+                .getElementById("btnClear")
+                ?.addEventListener("click", () => {
+                    const input = document.getElementById("rawText");
+                    if (input) {
+                        input.value = "";
+                        input.focus();
+                    }
+                });
+            document
+                .getElementById("applyFilter")
+                ?.addEventListener("click", () => refreshList());
+            document
+                .getElementById("refreshBtn")
+                ?.addEventListener("click", () => {
+                    refreshSummary();
+                    refreshList();
+                });
+            document
+                .getElementById("themeToggle")
+                ?.addEventListener("click", toggleTheme);
+            document
+                .getElementById("btnUploadKeluar")
+                ?.addEventListener("click", () =>
+                    requestReceiptUpload("keluar"),
+                );
+            document
+                .getElementById("btnUploadMasuk")
+                ?.addEventListener("click", () =>
+                    requestReceiptUpload("masuk"),
+                );
+            document
+                .getElementById("receiptInput")
+                ?.addEventListener("change", handleReceiptChange);
+
+            refreshSummary();
+            refreshList();
+        </script>
+    </body>
 </html>

@@ -1,9 +1,9 @@
 # 📒 PRD — Suki Finance Tracker (Apps Script Only, Gemini-powered)
 
 ## 🧩 Overview
-Sistem pencatat keuangan otomatis berbasis **Google Apps Script** dengan UI bergaya **neobrutalism** (colorful, playful, tegas, penuh emoji).  
+Sistem pencatat keuangan otomatis berbasis **Google Apps Script** dengan UI bergaya **Luminous Dashboard** (lihat `design-prompt.md` untuk detail visual).  
 Frontend dan backend berada dalam satu proyek Apps Script:
-- **Frontend (HtmlService)**: form input + daftar transaksi + ringkasan total.
+- **Frontend (HtmlService)**: form input + daftar transaksi + ringkasan total, menerapkan gaya Luminous Flow dengan gradien multi-layer, kartu floating, light/dark mode halus, chip interaktif, dan microcopy emoji.
 - **Backend (Code.gs)**: koneksi ke Google Sheet, parser angka & kategori, integrasi AI (Gemini 2.5 Flash) untuk memahami konteks transaksi secara cerdas.
 
 Menggunakan Gemini API untuk OCR struk dan OpenRouter untuk parsing AI.
@@ -17,6 +17,7 @@ OpenRouter digunakan untuk parsing teks OCR menjadi JSON terstruktur.
 ---
 
 ## 🧱 Arsitektur
+## 🧑‍💻 Arsitektur
 ```
 
 User (browser)
@@ -40,7 +41,14 @@ Gemini API (OCR struk) + OpenRouter API (parsing JSON)
 📋 Daftar Transaksi (5 terakhir)
 ────────────────────────────
 © Suki Finance · v1
-```
+
+---
+### Catatan Desain Frontend
+- UI tetap mengacu pada `design-prompt.md` untuk menjaga estetika Luminous Flow: gradien berlapis, glow blur, dan kartu floating.
+- Tema ganda light/dark dengan transisi lembut, preferensi tersimpan di `localStorage`, fallback ke `prefers-color-scheme`.
+- Palet memadukan indigo, cyan, dan aksen magenta; gradien ekstra diacak harian agar tampilan terus segar.
+- Layout card-based yang responsif, toast kaca buram, badge status dinamis, dan interaksi hover/fokus yang eksplisit.
+- Struktur panel dapat disesuaikan per domain, selama DNA visual (gradien, shadow lembut, microcopy emoji) tetap terjaga.
 
 ---
 

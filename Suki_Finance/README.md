@@ -1,11 +1,19 @@
 ## Suki Finance Tracker
 
-Aplikasi Apps Script ini memudahkan pencatatan pemasukan/pengeluaran lewat teks natural **dan** foto struk. Frontend neobrutalism di `index.html`, backend di `Code.gs`, data disimpan di sheet `transaksi`.
+Aplikasi Apps Script ini memudahkan pencatatan pemasukan/pengeluaran lewat teks natural **dan** foto struk. Frontend kini mengikuti desain **Luminous Dashboard** (lihat `design-prompt.md`), dengan DNA visual modern, premium, dan responsif. Backend tetap di `Code.gs`, data disimpan di sheet `transaksi`.
+
+### Pembaruan Desain Frontend
+- UI mendapat sentuhan **Luminous Flow**: kartu berlapis gradien, highlight blur, chip interaktif, dan shadow floating yang terasa premium.
+- **Light & Dark mode** kini berpindah mulus berkat animasi transisi global, preferensi tetap tersimpan di `localStorage`.
+- Palet utama memadukan indigo #6366f1, cyan #0ea5e9, dan aksen magenta lembut; gradien harian diacak untuk menjaga tampilan segar.
+- Layout card-driven yang responsif (mobile–desktop), hero dengan badge status, toast kaca buram, dan daftar transaksi yang hidup dengan hover micro-interaction.
+- Semua kontrol memiliki state fokus/hover jelas, microcopy emoji tetap hadir, dan komponen baru menjaga keterbacaan di kedua tema.
 
 ### Yang baru
 - Tombol **Upload Struk** untuk pemasukan & pengeluaran.
 - Gambar otomatis dikompresi (maks 1200px, < 8 MB) sebelum dikirim.
 - Gemini 2.5 melakukan OCR -> OpenRouter (model gratis) mem-parsing item dan memasukkannya ke Google Sheet per baris.
+- UI responsif mobile → desktop, toast helper, dan statistik kilat dalam kartu warna.
 
 ### Setup cepat (awam friendly)
 1. **Duplikasi sheet & Apps Script** ini ke akun Google kamu seperti biasa.
@@ -98,5 +106,12 @@ console.log('Tests passed');
 NODE
 ```
 Perintah tersebut memuat `Code.gs` di dalam sandbox dan menguji `normalizeAmountValue_` serta `buildRowsFromParsed_`.
+
+---
+
+### Catatan Desain
+- Frontend mengikuti brief di `design-prompt.md` agar konsisten dengan estetika Luminous Flow (gradien berlapis, blur glow, dan kartu floating).
+- Struktur panel / kartu boleh diganti sesuai domain, asalkan mempertahankan DNA: highlight gradien, shadow lembut, tipografi rapih, dan microcopy emoji.
+- Detail referensi visual (palet, elevation, tone) tersedia di `design-prompt.md`.
 
 Selamat mencoba! Jika ada kebutuhan tambahan (misal simpan gambar ke Drive), tinggal tambahkan di `processReceiptUpload` sebelum baris `appendTransactions_`.
