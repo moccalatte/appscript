@@ -29,7 +29,7 @@ Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-
 - `GITHUB_PAT` — Hindari rate-limit GitHub (token tanpa prefix `Bearer`)
 - `QDRANT_URL` — URL Qdrant, contoh: `https://qdrant.example.com`
 - `QDRANT_API_KEY` — API key Qdrant (jika diperlukan)
-- `QDRANT_COLLECTION` — Nama koleksi tujuan
+- `QDRANT_COLLECTION` — Nama koleksi tujuan (boleh memakai placeholder seperti `{{COL_NAME}}` atau `${COL_NAME}` selama variabel yang dirujuk tersedia di Script Properties)
 
 **Opsional (disarankan):**
 - `USE_AWESOME_DISCOVERY` (true/false) — Aktifkan discovery dari daftar awesome
@@ -51,9 +51,9 @@ Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-
 ## 2. Dedup & Trigger
 
 **Deduplication:**
-- Sheet `awesome_dedup` adalah sumber utama dedup (anti duplikasi).
+- Sheet `awesome_dedup` adalah sumber utama dedup (anti duplikasi) dengan kunci berbentuk `[collection=<nama_koleksi>]::repo@sha:path` sehingga tiap koleksi Qdrant terisolasi.
 - Kunci dedup hanya ditulis setelah upsert ke Qdrant sukses (kode 2xx).
-- Untuk legacy, beberapa helper masih pakai `PropertiesService` — migrasi ke sheet disarankan.
+- Jika masih ada DEDUP_ lawas di Script Properties, jalankan fungsi `runMigrateDedupSilent()` sekali untuk memindahkannya ke sheet.
 
 **Trigger:**
 - Otomatis:  
@@ -92,10 +92,10 @@ Qdrant Feeder adalah Google Apps Script untuk men-scrape daftar README "awesome-
 ## 4. Struktur Log & Dedup
 
 **Sheet `logs`:**
-- Kolom: `timestamp`, `repo`, `file_path`, `size_bytes`, `chunk_idx/total`, `point_id`, `qdrant_http_status`, `qdrant_result_points_upserted`, `error_message`, `elapsed_ms`, `dedup_key`, `dedup_ts`
+- Kolom: `timestamp`, `repo`, `file_path`, `size_bytes`, `chunk_idx/total`, `point_id`, `qdrant_http_status`, `qdrant_result_points_upserted`, `error_message`, `elapsed_ms`, `dedup_key`, `dedup_ts`, `collection_name`, `qdrant_url`, `vector_name`, `vector_size`, `run_mode`
 
 **Sheet `awesome_dedup`:**
-- Kolom: `dedup_key` (`owner/repo@blobSha:path`), `ts` (ISO UTC)
+- Kolom: `dedup_key` (`[collection=...]::owner/repo@blobSha:path`), `ts` (ISO UTC)
 
 **Sheet `awesome_repo_history`:**
 - Kolom: `repo_full_name`, `last_status`, `commit_sha`, `ts`

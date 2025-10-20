@@ -57,7 +57,15 @@ function readAwesomeIntegrationConfig() {
   };
   try {
     var props = PropertiesService.getScriptProperties();
-    var v = props.getProperty('AWESOME_DEFAULT_LISTS_JSON');
+    var propsMap = getScriptPropertiesSafeMap(props);
+    function resolved(key) {
+      var val = resolveScriptProperty(props, propsMap, key);
+      if (val !== null && val !== undefined) {
+        propsMap[key] = val;
+      }
+      return val;
+    }
+    var v = resolved('AWESOME_DEFAULT_LISTS_JSON');
     if (v) {
       try {
         var parsed = JSON.parse(v);
@@ -75,19 +83,19 @@ function readAwesomeIntegrationConfig() {
         // ignore invalid JSON, keep default
       }
     }
-    var mr = parseInt(props.getProperty('AWESOME_MAX_REPOS_PER_RUN') || '', 10);
+    var mr = parseInt((resolved('AWESOME_MAX_REPOS_PER_RUN') || '').trim(), 10);
     if (!isNaN(mr) && mr > 0) cfg.maxReposPerRun = mr;
-    var mf = parseInt(props.getProperty('AWESOME_MAX_FILES_PER_REPO') || '', 10);
+    var mf = parseInt((resolved('AWESOME_MAX_FILES_PER_REPO') || '').trim(), 10);
     if (!isNaN(mf) && mf > 0) cfg.maxFilesPerRepo = mf;
-    var mv = parseInt(props.getProperty('AWESOME_MAX_VALIDATION_REQUESTS') || '', 10);
+    var mv = parseInt((resolved('AWESOME_MAX_VALIDATION_REQUESTS') || '').trim(), 10);
     if (!isNaN(mv) && mv > 0) cfg.maxValidationRequests = mv;
-    var dn = props.getProperty('AWESOME_DEDUP_SHEET_NAME');
+    var dn = resolved('AWESOME_DEDUP_SHEET_NAME');
     if (dn) cfg.dedupSheetName = dn;
-    var hs = props.getProperty('AWESOME_HISTORY_SHEET_NAME');
+    var hs = resolved('AWESOME_HISTORY_SHEET_NAME');
     if (hs) cfg.historySheetName = hs;
-    var hd = parseInt(props.getProperty('AWESOME_HISTORY_EXPIRY_DAYS') || '', 10);
+    var hd = parseInt((resolved('AWESOME_HISTORY_EXPIRY_DAYS') || '').trim(), 10);
     if (!isNaN(hd)) cfg.historyExpiryDays = hd;
-    var al = props.getProperty('AWESOME_ALLOWED_LANGS_JSON');
+    var al = resolved('AWESOME_ALLOWED_LANGS_JSON');
     if (al) {
       try {
         var parsedLangs = JSON.parse(al);
@@ -107,7 +115,7 @@ function readAwesomeIntegrationConfig() {
         // ignore invalid JSON, keep default
       }
     }
-    var skipAwesomeNamedRaw = props.getProperty('AWESOME_SKIP_AWESOME_NAMED');
+    var skipAwesomeNamedRaw = resolved('AWESOME_SKIP_AWESOME_NAMED');
     if (skipAwesomeNamedRaw !== null && skipAwesomeNamedRaw !== undefined && skipAwesomeNamedRaw !== '') {
       var skipStr = String(skipAwesomeNamedRaw).toLowerCase();
       if (skipStr === 'false' || skipStr === '0' || skipStr === 'no') {
@@ -118,7 +126,7 @@ function readAwesomeIntegrationConfig() {
     }
 
     // VERBOSE_LOGGING can be set as Script Property (true/1/yes)
-    var vb = props.getProperty('VERBOSE_LOGGING');
+    var vb = resolved('VERBOSE_LOGGING');
     if (vb !== null && vb !== undefined && String(vb).toLowerCase() !== '') {
       var s = String(vb).toLowerCase();
       if (s === 'true' || s === '1' || s === 'yes') cfg.verboseLogging = true;
@@ -257,7 +265,7 @@ function loadDedupMap(sheet) {
     var vals = range.getValues();
     for (var i = 0; i < vals.length; i++) {
       var k = vals[i][0];
-      if (k) map[String(k)] = true;
+      if (k) registerDedupKeyLocal(map, k);
     }
   } catch (e) {
     // ignore - empty map
@@ -270,7 +278,7 @@ function loadDedupMap(sheet) {
  * Appends dedup keys to the dedup sheet. keys: array of string keys.
  * Hybrid observability: mirrors dedup writes into `logs` for operator visibility.
  */
-function appendDedupKeys(sheet, keys) {
+function appendDedupKeys(sheet, keys, logMeta, tz) {
   if (!sheet || !keys || keys.length === 0) return;
   var rows = [];
   var ts = Utilities.formatDate(new Date(), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
@@ -291,29 +299,12 @@ function appendDedupKeys(sheet, keys) {
   // for performance (loadDedupMap reads from it), but mirror events to logs for visibility.
   try {
     var sheetCtx = ensureSheet();
-    var tz = (Session && typeof Session.getScriptTimeZone === 'function') ? Session.getScriptTimeZone() : 'UTC';
+    var tzLocal = tz || (Session && typeof Session.getScriptTimeZone === 'function' ? Session.getScriptTimeZone() : 'UTC');
     var logRows = [];
     for (var k = 0; k < keys.length; k++) {
       var dk = keys[k];
-      // Build a log row matching the logs header:
-      // timestamp, repo, file_path, size_bytes, chunk_idx/total, point_id, qdrant_http_status,
-      // qdrant_result_points_upserted, error_message, elapsed_ms, dedup_key, dedup_ts
-      var tsLocal = Utilities.formatDate(new Date(), tz || 'UTC', "yyyy-MM-dd'T'HH:mm:ssZ");
-      var row = [
-        tsLocal,        // timestamp
-        '',             // repo
-        '',             // file_path
-        0,              // size_bytes
-        '',             // chunk_idx/total
-        '',             // point_id
-        '',             // qdrant_http_status
-        0,              // qdrant_result_points_upserted
-        'dedup-key-added', // error_message / note
-        0,              // elapsed_ms
-        dk,             // dedup_key
-        ts              // dedup_ts (UTC canonical)
-      ];
-      logRows.push(row);
+      var meta = extendLogMeta(logMeta, { dedupKey: dk, dedupTs: ts });
+      logRows.push(makeLogRow(tzLocal, '', '', 0, -1, -1, '', null, 0, 'dedup-key-added', 0, meta));
     }
     if (logRows.length > 0) {
       appendLog(sheetCtx.sheet, logRows);
@@ -645,6 +636,7 @@ function runAwesomeFeed(opts) {
   var mode = opts.mode || 'production';
   var cfg = readAwesomeIntegrationConfig();
   var appCfg = getConfig();
+  var logMeta = createLogMeta(appCfg, null, mode);
   var maxRepos = (typeof opts.maxRepos === 'number' && opts.maxRepos > 0) ? opts.maxRepos : cfg.maxReposPerRun;
   var maxFilesPerRepo = (typeof opts.maxFilesPerRepo === 'number' && opts.maxFilesPerRepo > 0) ? opts.maxFilesPerRepo : cfg.maxFilesPerRepo;
   var dedupSheetName = cfg.dedupSheetName;
@@ -655,9 +647,10 @@ function runAwesomeFeed(opts) {
   // Preflight Qdrant
   var pf = preflightQdrant();
   if (!pf.ok) {
-    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', pf.status || '', 0, pf.error || 'qdrant preflight failed', pf.elapsedMs || 0)]);
+    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', pf.status || '', 0, pf.error || 'qdrant preflight failed', pf.elapsedMs || 0, logMeta)]);
     return false;
   }
+  updateLogMetaWithVector(logMeta, pf.vector);
   var vectorCfg = pf.vector || { useNamed: false, size: 384, name: null };
   var historySheet = getRepoHistorySheet(cfg.historySheetName);
   var historyMap = loadRepoHistoryMap(historySheet, cfg.historyExpiryDays);
@@ -667,11 +660,11 @@ function runAwesomeFeed(opts) {
   try {
     repos = discoverReposFromAwesomeLists(maxRepos, { historySheet: historySheet, historyMap: historyMap });
   } catch (e) {
-    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'discoverRepos error: ' + String(e), 0)]);
+    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'discoverRepos error: ' + String(e), 0, logMeta)]);
     return false;
   }
   if (!repos || repos.length === 0) {
-    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'no-awesome-repos-found', 0)]);
+    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'no-awesome-repos-found', 0, logMeta)]);
     return false;
   }
 
@@ -681,7 +674,7 @@ function runAwesomeFeed(opts) {
   var newDedupKeys = [];
 
   // Log discovered repos
-  appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', '', (repos && repos.length) ? repos.length : 0, 'awesome-repos-found ' + repos.map(function(x){ return x.fullName; }).join(','), 0)]);
+  appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', '', (repos && repos.length) ? repos.length : 0, 'awesome-repos-found ' + repos.map(function(x){ return x.fullName; }).join(','), 0, logMeta)]);
 
   var totalPoints = 0;
   var processedRepos = 0;
@@ -717,12 +710,12 @@ function runAwesomeFeed(opts) {
       processedRepos++;
 
       var tree = listTreeRecursive(repo.owner, repo.name, meta.commitSha);
-      var files = selectFiles(tree, maxFilesPerRepo, appCfg.MAX_FILE_SIZE_BYTES, repoFullName, meta.commitSha);
+      var files = selectFiles(tree, maxFilesPerRepo, appCfg.MAX_FILE_SIZE_BYTES, repoFullName, meta.commitSha, logMeta.collectionName);
 
       if (!files || files.length === 0) {
         repoStatus = 'no-eligible-files';
         try {
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, '', 0, -1, -1, '', null, 0, 'no-eligible-files (tree_len=' + (tree ? tree.length : 0) + ')', 0)]);
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, '', 0, -1, -1, '', null, 0, 'no-eligible-files (tree_len=' + (tree ? tree.length : 0) + ')', 0, logMeta)]);
         } catch (eLogNoFiles) {}
         if (!historyRecorded) {
           recordRepoHistory(historySheet, historyMap, repoFullName, repoStatus, meta.commitSha, tz, cfg.historyExpiryDays);
@@ -734,22 +727,22 @@ function runAwesomeFeed(opts) {
       for (var fi = 0; fi < files.length; fi++) {
         var file = files[fi];
         repoHadFiles = true;
-        var dkey = dedupKey(repoFullName, file.path, file.sha);
+        var dedupKeys = buildDedupKeyVariants(repoFullName, file.path, file.sha, logMeta.collectionName);
 
-        if (dedupMap[dkey]) {
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, file.size || 0, -1, -1, '', null, 0, 'dedup-skip (sheet)', 0)]);
+        if (dedupMap[dedupKeys.primary] || dedupMap[dedupKeys.legacy]) {
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, file.size || 0, -1, -1, '', null, 0, 'dedup-skip (sheet)', 0, extendLogMeta(logMeta, { dedupKey: dedupKeys.primary }))]);
           continue;
         }
 
         var raw = fetchRaw(repo.owner, repo.name, meta.commitSha, file.path);
         if (raw.error) {
           repoHadErrors = true;
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, file.size || 0, -1, -1, '', null, 0, raw.error, 0)]);
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, file.size || 0, -1, -1, '', null, 0, raw.error, 0, logMeta)]);
           continue;
         }
         if (raw.bytes > appCfg.MAX_FILE_SIZE_BYTES) {
           repoHadErrors = true;
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, raw.bytes, -1, -1, '', null, 0, 'raw-too-large', 0)]);
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, raw.bytes, -1, -1, '', null, 0, 'raw-too-large', 0, logMeta)]);
           continue;
         }
 
@@ -759,7 +752,7 @@ function runAwesomeFeed(opts) {
         var chunks = chunkText(raw.text, appCfg.CHUNK_SIZE_CHARS, appCfg.CHUNK_OVERLAP_CHARS);
         if (!chunks || chunks.length === 0) {
           repoHadErrors = true;
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, raw.bytes, -1, -1, '', null, 0, 'no-chunks', 0)]);
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, raw.bytes, -1, -1, '', null, 0, 'no-chunks', 0, logMeta)]);
           continue;
         }
 
@@ -781,14 +774,14 @@ function runAwesomeFeed(opts) {
 
         if (!points || points.length === 0) {
           repoHadErrors = true;
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, raw.bytes, -1, -1, '', null, 0, 'no-points-generated', 0)]);
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, file.path, raw.bytes, -1, -1, '', null, 0, 'no-points-generated', 0, logMeta)]);
           continue;
         }
 
         var fileLogs = [];
         for (var c = 0; c < points.length; c++) {
           var p = points[c];
-          fileLogs.push(makeLogRow(tz, repoFullName, file.path, raw.bytes, p.payload.chunk_idx, p.payload.chunk_total, p.id, null, 0, '', 0));
+          fileLogs.push(makeLogRow(tz, repoFullName, file.path, raw.bytes, p.payload.chunk_idx, p.payload.chunk_total, p.id, null, 0, '', 0, logMeta));
         }
 
         var allOk = true;
@@ -814,8 +807,9 @@ function runAwesomeFeed(opts) {
         appendLog(sheetCtx.sheet, fileLogs);
 
         if (allOk) {
-          dedupMap[dkey] = true;
-          newDedupKeys.push(dkey);
+          dedupMap[dedupKeys.primary] = true;
+          dedupMap[dedupKeys.legacy] = true;
+          newDedupKeys.push(dedupKeys.primary);
         }
       }
 
@@ -830,7 +824,7 @@ function runAwesomeFeed(opts) {
       }
     } catch (eRepo) {
       repoStatus = 'error';
-      appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, '', 0, -1, -1, '', null, 0, 'repo error: ' + String(eRepo), 0)]);
+      appendLog(sheetCtx.sheet, [makeLogRow(tz, repoFullName, '', 0, -1, -1, '', null, 0, 'repo error: ' + String(eRepo), 0, logMeta)]);
     }
 
     if (!historyRecorded) {
@@ -844,10 +838,10 @@ function runAwesomeFeed(opts) {
 
   // Persist new dedup keys in sheet
   if (newDedupKeys.length > 0) {
-    appendDedupKeys(dedupSheet, newDedupKeys);
+    appendDedupKeys(dedupSheet, newDedupKeys, logMeta, tz);
   }
 
-  appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', totalPoints || 0, -1, -1, '', summaryOk ? 200 : '', totalPoints || 0, 'awesome-run-summary repos=' + String(processedRepos) + ' points=' + String(totalPoints), 0)]);
+  appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', totalPoints || 0, -1, -1, '', summaryOk ? 200 : '', totalPoints || 0, 'awesome-run-summary repos=' + String(processedRepos) + ' points=' + String(totalPoints), 0, logMeta)]);
   return true;
 }
 
@@ -892,8 +886,14 @@ function appendLogIfAvailable(tag, msg) {
       try {
         var sheetCtx = ensureSheet();
         var tz = (Session && typeof Session.getScriptTimeZone === 'function') ? Session.getScriptTimeZone() : 'UTC';
+        var meta = {};
+        try {
+          meta = createLogMeta(getConfig(), null, '');
+        } catch (eMeta) {
+          meta = {};
+        }
         if (sheetCtx && sheetCtx.sheet) {
-          appendLog(sheetCtx.sheet, [ makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, tag + ': ' + String(msg), 0) ]);
+          appendLog(sheetCtx.sheet, [ makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, tag + ': ' + String(msg), 0, meta) ]);
           return;
         }
       } catch (e) {

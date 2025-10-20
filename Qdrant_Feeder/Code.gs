@@ -30,7 +30,7 @@ function runTick(options) {
       if (mode === 'production' && iteration === 0) {
         ensureScheduledTriggers(cfg);
       }
-      var shouldContinue = runTickOnce(cfg, sheetCtx, tz);
+      var shouldContinue = runTickOnce(cfg, sheetCtx, tz, { mode: mode });
       iteration++;
       if (mode !== 'test') {
         break;
@@ -56,25 +56,29 @@ function runTick(options) {
   }
 }
 
-function runTickOnce(cfg, sheetCtx, tz) {
+function runTickOnce(cfg, sheetCtx, tz, options) {
+  options = options || {};
+  var runMode = options.mode || '';
+  var logMeta = createLogMeta(cfg, null, runMode);
   // Guard required Qdrant config
   if (!cfg.QDRANT_URL || !cfg.QDRANT_API_KEY) {
-    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'missing Qdrant config', 0)]);
+    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'missing Qdrant config', 0, logMeta)]);
     return false;
   }
 
   // Preflight Qdrant collection and vector config
   var pf = preflightQdrant();
   if (!pf.ok) {
-    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', pf.status || '', 0, pf.error || 'qdrant preflight failed', pf.elapsedMs || 0)]);
+    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', pf.status || '', 0, pf.error || 'qdrant preflight failed', pf.elapsedMs || 0, logMeta)]);
     return false;
   }
+  updateLogMetaWithVector(logMeta, pf.vector);
 
   var repos;
   try {
     repos = pickRepos(cfg.MAX_REPOS_PER_RUN);
   } catch (ePick) {
-    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'pickRepos error: ' + String(ePick), 0)]);
+    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'pickRepos error: ' + String(ePick), 0, logMeta)]);
     return false;
   }
   if (!repos || repos.length === 0) {
@@ -83,11 +87,11 @@ function runTickOnce(cfg, sheetCtx, tz) {
     try {
       repos = pickRepos(cfg.MAX_REPOS_PER_RUN);
     } catch (ePick2) {
-      appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'pickRepos retry error: ' + String(ePick2), 0)]);
+      appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'pickRepos retry error: ' + String(ePick2), 0, logMeta)]);
       return false;
     }
     if (!repos || repos.length === 0) {
-      appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'no-repos', 0)]);
+      appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, 'no-repos', 0, logMeta)]);
       return false;
     }
   }
@@ -107,7 +111,8 @@ function runTickOnce(cfg, sheetCtx, tz) {
     '',
     (repos && repos.length) ? repos.length : 0,
     'repos-found ' + ((repos && repos.length) ? repos.map(function(x){ return x.fullName; }).join(',') : ''),
-    0
+    0,
+    logMeta
   )]);
 
   for (var r = 0; r < repos.length; r++) {
@@ -116,25 +121,25 @@ function runTickOnce(cfg, sheetCtx, tz) {
     try {
       var meta = fetchRepoMeta(repo.owner, repo.name);
       var tree = listTreeRecursive(repo.owner, repo.name, meta.commitSha);
-      var files = selectFiles(tree, cfg.MAX_FILES_PER_REPO, cfg.MAX_FILE_SIZE_BYTES, repo.fullName, meta.commitSha);
+      var files = selectFiles(tree, cfg.MAX_FILES_PER_REPO, cfg.MAX_FILE_SIZE_BYTES, repo.fullName, meta.commitSha, logMeta.collectionName);
 
       for (var f = 0; f < files.length; f++) {
         var file = files[f];
-        var dkey = dedupKey(repo.fullName, file.path, file.sha);
-        if (hasDedupKey(dkey)) {
+        var dedupKeys = buildDedupKeyVariants(repo.fullName, file.path, file.sha, logMeta.collectionName);
+        if (hasDedupKey(dedupKeys)) {
           // log dedup skip (size from tree, raw not fetched)
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, file.size || 0, -1, -1, '', null, 0, 'dedup-skip', 0)]);
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, file.size || 0, -1, -1, '', null, 0, 'dedup-skip', 0, extendLogMeta(logMeta, { dedupKey: dedupKeys.primary }))]);
           continue;
         }
 
         var raw = fetchRaw(repo.owner, repo.name, meta.commitSha, file.path);
         if (raw.error) {
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, file.size || 0, -1, -1, '', null, 0, raw.error, 0)]);
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, file.size || 0, -1, -1, '', null, 0, raw.error, 0, logMeta)]);
           continue;
         }
         if (raw.bytes > cfg.MAX_FILE_SIZE_BYTES) {
           // Guard against unexpected large raw content
-          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'raw-too-large', 0)]);
+          appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'raw-too-large', 0, logMeta)]);
           continue;
         }
 
@@ -159,7 +164,7 @@ function runTickOnce(cfg, sheetCtx, tz) {
         var fileLogs = [];
         for (var c = 0; c < points.length; c++) {
           var p = points[c];
-          fileLogs.push(makeLogRow(tz, repo.fullName, file.path, raw.bytes, p.payload.chunk_idx, p.payload.chunk_total, p.id, null, 0, '', 0));
+          fileLogs.push(makeLogRow(tz, repo.fullName, file.path, raw.bytes, p.payload.chunk_idx, p.payload.chunk_total, p.id, null, 0, '', 0, logMeta));
         }
 
         // Upsert per-file in slices ≤ 50
@@ -194,16 +199,24 @@ function runTickOnce(cfg, sheetCtx, tz) {
             if (ds) {
               try {
                 var ts = Utilities.formatDate(new Date(), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
-                ds.appendRow([dkey, ts]);
+                ds.appendRow([dedupKeys.primary, ts]);
                 // keep in-memory cache in sync if present
-                try { if (typeof DEDUP_CACHE !== 'undefined' && DEDUP_CACHE !== null) DEDUP_CACHE[String(dkey)] = true; } catch (eCache) {}
+                try {
+                  if (typeof DEDUP_CACHE !== 'undefined' && DEDUP_CACHE !== null) {
+                    registerDedupKeyLocal(DEDUP_CACHE, dedupKeys.primary);
+                  }
+                } catch (eCache) {}
               } catch (eAppend) {
                 // If sheet append fails, log to logs for observability but do NOT write to PropertiesService (avoid property limits)
-                try { appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'dedup-append-failed', 0)]); } catch (ee) {}
+                try {
+                  appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'dedup-append-failed', 0, extendLogMeta(logMeta, { dedupKey: dedupKeys.primary }))]);
+                } catch (ee) {}
               }
             } else {
               // Sheet not available: log and skip dedup write (do not use PropertiesService)
-              try { appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'dedup-sheet-missing', 0)]); } catch (ee2) {}
+              try {
+                appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, file.path, raw.bytes, -1, -1, '', null, 0, 'dedup-sheet-missing', 0, extendLogMeta(logMeta, { dedupKey: dedupKeys.primary }))]);
+              } catch (ee2) {}
             }
           } catch (eOverall) {
             // best-effort only; do not fail processing if dedup logging fails
@@ -213,7 +226,7 @@ function runTickOnce(cfg, sheetCtx, tz) {
 
     } catch (eRepo) {
       // Log repo-level error
-      appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, '', 0, -1, -1, '', null, 0, String(eRepo), 0)]);
+      appendLog(sheetCtx.sheet, [makeLogRow(tz, repo.fullName, '', 0, -1, -1, '', null, 0, String(eRepo), 0, logMeta)]);
     }
   }
 
@@ -229,7 +242,8 @@ function runTickOnce(cfg, sheetCtx, tz) {
     summaryOk ? 200 : '', // qdrant_http_status
     totalPoints || 0,     // qdrant_result_points_upserted
     'run-summary repos=' + String(processedRepos) + ' points=' + String(totalPoints),
-    0                 // elapsed_ms (optional)
+    0,                 // elapsed_ms (optional)
+    logMeta
   )]);
 
   // Save paging cursor
@@ -238,27 +252,89 @@ function runTickOnce(cfg, sheetCtx, tz) {
   return true;
 }
 
+function getScriptPropertiesSafeMap(props) {
+  if (!props || typeof props.getProperties !== 'function') return {};
+  try {
+    return props.getProperties() || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function resolvePropertyTokens(value, propsMap, stack) {
+  if (value === null || value === undefined) return value;
+  var str = String(value);
+  if (!propsMap) propsMap = {};
+  stack = stack || [];
+  if (stack.length > 20) return str; // prevent runaway recursion
+  var tokenRe = /(\{\{\s*([A-Za-z0-9_\-]+)\s*\}\}|\$\{\s*([A-Za-z0-9_\-]+)\s*\})/g;
+  var replaced = false;
+  var result = str.replace(tokenRe, function(match, _, braceKey, dollarKey) {
+    var key = braceKey || dollarKey;
+    if (!key) return match;
+    if (stack.indexOf(key) !== -1) return match; // cycle guard
+    if (!propsMap || propsMap[key] === undefined) return match;
+    var next = resolvePropertyTokens(propsMap[key], propsMap, stack.concat([key]));
+    if (next === null || next === undefined) return '';
+    replaced = true;
+    return String(next);
+  });
+  if (replaced && result !== str) {
+    return resolvePropertyTokens(result, propsMap, stack);
+  }
+  return result;
+}
+
+function resolveScriptProperty(props, propsMap, key) {
+  if (!props || typeof props.getProperty !== 'function') return null;
+  var raw = null;
+  try {
+    raw = props.getProperty(key);
+  } catch (e) {
+    raw = null;
+  }
+  if (raw === null || raw === undefined) return null;
+  return resolvePropertyTokens(raw, propsMap, [key]);
+}
+
 function getConfig() {
   var props = PropertiesService.getScriptProperties();
-  function intProp(k, d) {
-    var v = props.getProperty(k);
-    return v ? parseInt(v, 10) : d;
+  var propsMap = getScriptPropertiesSafeMap(props);
+  function stringProp(key, dflt) {
+    var resolved = resolveScriptProperty(props, propsMap, key);
+    if (resolved === null || resolved === undefined) return dflt;
+    propsMap[key] = resolved;
+    return String(resolved);
+  }
+  function intProp(key, dflt) {
+    var resolved = resolveScriptProperty(props, propsMap, key);
+    if (resolved === null || resolved === undefined) return dflt;
+    var str = String(resolved).trim();
+    if (str === '') return dflt;
+    var parsed = parseInt(str, 10);
+    return isNaN(parsed) ? dflt : parsed;
+  }
+  function boolPropValue(key, dflt) {
+    var resolved = resolveScriptProperty(props, propsMap, key);
+    if (resolved === null || resolved === undefined) return dflt;
+    return propBool(resolved, dflt);
   }
   return {
-    GITHUB_PAT: props.getProperty('GITHUB_PAT') || '',
-    QDRANT_API_KEY: props.getProperty('QDRANT_API_KEY') || '',
-    QDRANT_URL: props.getProperty('QDRANT_URL') || '',
-    QDRANT_COLLECTION: props.getProperty('QDRANT_COLLECTION') || '',
+    GITHUB_PAT: stringProp('GITHUB_PAT', ''),
+    QDRANT_API_KEY: stringProp('QDRANT_API_KEY', ''),
+    QDRANT_URL: stringProp('QDRANT_URL', ''),
+    QDRANT_COLLECTION: stringProp('QDRANT_COLLECTION', ''),
     MAX_REPOS_PER_RUN: intProp('MAX_REPOS_PER_RUN', 2),
     MAX_FILES_PER_REPO: intProp('MAX_FILES_PER_REPO', 6),
     MAX_FILE_SIZE_BYTES: intProp('MAX_FILE_SIZE_BYTES', 65536),
     CHUNK_SIZE_CHARS: intProp('CHUNK_SIZE_CHARS', 3000),
     CHUNK_OVERLAP_CHARS: intProp('CHUNK_OVERLAP_CHARS', 200),
-    TRIGGER_AUTO_INSTALL: propBool(props.getProperty('TRIGGER_AUTO_INSTALL'), true),
+    TRIGGER_AUTO_INSTALL: boolPropValue('TRIGGER_AUTO_INSTALL', true),
     TRIGGER_DAILY_HOUR: intProp('TRIGGER_DAILY_HOUR', 1),
     TRIGGER_INTERVAL_MINUTES: intProp('TRIGGER_INTERVAL_MINUTES', 15),
     TEST_LOOP_MAX_RUNTIME_MS: intProp('TEST_LOOP_MAX_RUNTIME_MS', 280000),
-    TEST_LOOP_SLEEP_MS: intProp('TEST_LOOP_SLEEP_MS', 0)
+    TEST_LOOP_SLEEP_MS: intProp('TEST_LOOP_SLEEP_MS', 0),
+    USE_AWESOME_DISCOVERY: boolPropValue('USE_AWESOME_DISCOVERY', false)
   };
 }
 
@@ -278,22 +354,45 @@ function ensureSheet() {
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
   }
-  // Ensure header (simple, deterministic header creation)
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow([
-      'timestamp',
-      'repo',
-      'file_path',
-      'size_bytes',
-      'chunk_idx/total',
-      'point_id',
-      'qdrant_http_status',
-      'qdrant_result_points_upserted',
-      'error_message',
-      'elapsed_ms',
-      'dedup_key',
-      'dedup_ts'
-    ]);
+  var header = [
+    'timestamp',
+    'repo',
+    'file_path',
+    'size_bytes',
+    'chunk_idx/total',
+    'point_id',
+    'qdrant_http_status',
+    'qdrant_result_points_upserted',
+    'error_message',
+    'elapsed_ms',
+    'dedup_key',
+    'dedup_ts',
+    'collection_name',
+    'qdrant_url',
+    'vector_name',
+    'vector_size',
+    'run_mode'
+  ];
+  var headerLen = header.length;
+  try {
+    var maxCols = sheet.getMaxColumns();
+    if (maxCols < headerLen) {
+      sheet.insertColumnsAfter(maxCols, headerLen - maxCols);
+    }
+  } catch (e) {
+    // best-effort; continue even if column resize fails
+  }
+  try {
+    sheet.getRange(1, 1, 1, headerLen).setValues([header]);
+  } catch (eSet) {
+    // fallback: append when setValues fails on empty sheets
+    if (sheet.getLastRow() === 0) {
+      try {
+        sheet.appendRow(header);
+      } catch (eAppend) {
+        // swallow
+      }
+    }
   }
   return { spreadsheet: ss, sheet: sheet };
 }
@@ -340,17 +439,12 @@ function pickRepos(maxCount) {
   // Enhanced pickRepos: optionally use awesome-list discovery when enabled.
   // If discovery via awesome lists fails or is disabled, fallback to the original GitHub Search logic.
   maxCount = (typeof maxCount === 'number' && maxCount > 0) ? maxCount : 10;
+  var appCfg = getConfig();
+  var logMeta = createLogMeta(appCfg, null, '');
 
   // Check runtime flag: USE_AWESOME_DISCOVERY in Script Properties (true/1/yes)
   try {
-    var props = PropertiesService.getScriptProperties();
-    var useAwesomeRaw = props.getProperty('USE_AWESOME_DISCOVERY');
-    var useAwesome = false;
-    if (useAwesomeRaw !== null && useAwesomeRaw !== undefined && useAwesomeRaw !== '') {
-      var s = String(useAwesomeRaw).toLowerCase();
-      if (s === 'true' || s === '1' || s === 'yes') useAwesome = true;
-    }
-    if (useAwesome && typeof discoverReposFromAwesomeLists === 'function') {
+    if (appCfg.USE_AWESOME_DISCOVERY && typeof discoverReposFromAwesomeLists === 'function') {
       try {
         var discovered = discoverReposFromAwesomeLists(maxCount);
         if (discovered && discovered.length > 0) {
@@ -358,7 +452,7 @@ function pickRepos(maxCount) {
           try {
             var sheetCtx = ensureSheet();
             var tz = Session && typeof Session.getScriptTimeZone === 'function' ? Session.getScriptTimeZone() : 'UTC';
-            appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', '', discovered.length, 'pickRepos: used awesome discovery ' + discovered.map(function(x){ return x.fullName; }).join(','), 0)]);
+            appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', '', discovered.length, 'pickRepos: used awesome discovery ' + discovered.map(function(x){ return x.fullName; }).join(','), 0, logMeta)]);
           } catch (e) {
             // ignore logging errors
           }
@@ -369,7 +463,7 @@ function pickRepos(maxCount) {
         try {
           var sheetCtx2 = ensureSheet();
           var tz2 = Session && typeof Session.getScriptTimeZone === 'function' ? Session.getScriptTimeZone() : 'UTC';
-          appendLog(sheetCtx2.sheet, [makeLogRow(tz2, '', '', 0, -1, -1, '', null, 0, 'awesome discovery failed: ' + String(e), 0)]);
+          appendLog(sheetCtx2.sheet, [makeLogRow(tz2, '', '', 0, -1, -1, '', null, 0, 'awesome discovery failed: ' + String(e), 0, logMeta)]);
         } catch (e2) {}
       }
     }
@@ -378,7 +472,6 @@ function pickRepos(maxCount) {
   }
 
   // --- Original GitHub search-based logic (fallback) ---
-  var cfg = getConfig();
   var cursorPage = getCursorPage();
 
   var now = new Date();
@@ -484,15 +577,15 @@ function listTreeRecursive(owner, repo, sha) {
   return files;
 }
 
-function selectFiles(files, maxFiles, maxSize, repoFullName, commitSha) {
+function selectFiles(files, maxFiles, maxSize, repoFullName, commitSha, collectionName) {
   var selected = [];
   var candidates = [];
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     if (isEligiblePath(f.path, f.size, maxSize)) {
       // Staged consumption: skip files already processed (dedup) so runs can gradually consume all .py/.go/.js
-      var dkey = dedupKey(repoFullName, f.path, f.sha);
-      if (!hasDedupKey(dkey)) {
+      var dkeys = buildDedupKeyVariants(repoFullName, f.path, f.sha, collectionName);
+      if (!hasDedupKey(dkeys)) {
         candidates.push(f);
       }
     }
@@ -798,8 +891,51 @@ function getGitHub(url) {
   }
 }
 
-function dedupKey(repoFullName, path, blobSha) {
-  return repoFullName + '@' + blobSha + ':' + path;
+function buildDedupKeyVariants(repoFullName, path, blobSha, collectionName) {
+  var repo = repoFullName || '';
+  var sha = blobSha || '';
+  var filePath = path || '';
+  var base = repo + '@' + sha + ':' + filePath;
+  var coll = collectionName ? String(collectionName) : '';
+  if (coll) {
+    return {
+      primary: '[collection=' + encodeURIComponent(coll) + ']::' + base,
+      legacy: base,
+      collection: coll
+    };
+  }
+  return {
+    primary: base,
+    legacy: base,
+    collection: coll
+  };
+}
+
+function dedupKey(repoFullName, path, blobSha, collectionName) {
+  return buildDedupKeyVariants(repoFullName, path, blobSha, collectionName).primary;
+}
+
+function extractLegacyDedupKey(key) {
+  if (!key && key !== 0) return '';
+  var str = String(key);
+  if (str.indexOf('[collection=') === 0) {
+    var marker = ']::';
+    var idx = str.indexOf(marker);
+    if (idx !== -1) {
+      return str.substring(idx + marker.length);
+    }
+  }
+  return str;
+}
+
+function registerDedupKeyLocal(store, key) {
+  if (!store || key === null || key === undefined) return;
+  var strKey = String(key);
+  store[strKey] = true;
+  var legacy = extractLegacyDedupKey(strKey);
+  if (legacy && legacy !== strKey) {
+    store[legacy] = true;
+  }
 }
 
 /* ---------- Dedup helpers (sheet-based consolidated) ---------- */
@@ -824,7 +960,7 @@ function loadDedupCache() {
     var vals = sheet.getRange(2, 1, last - 1, 1).getValues();
     for (var i = 0; i < vals.length; i++) {
       var k = vals[i][0];
-      if (k) DEDUP_CACHE[String(k)] = true;
+      if (k) registerDedupKeyLocal(DEDUP_CACHE, k);
     }
   } catch (e) {
     // best-effort: leave cache empty on error
@@ -834,9 +970,17 @@ function loadDedupCache() {
 
 function hasDedupKey(key) {
   if (!key) return false;
+  if (typeof key === 'object') {
+    if (key.primary && hasDedupKey(key.primary)) return true;
+    if (key.legacy && hasDedupKey(key.legacy)) return true;
+    return false;
+  }
   try {
     var cache = loadDedupCache();
-    if (cache[String(key)]) return true;
+    var strKey = String(key);
+    if (cache[strKey]) return true;
+    var legacy = extractLegacyDedupKey(strKey);
+    if (legacy && legacy !== strKey && cache[legacy]) return true;
   } catch (e) {
     // ignore cache errors
   }
@@ -857,7 +1001,7 @@ function markDedupKey(key) {
       var ts = Utilities.formatDate(new Date(), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
       sheet.appendRow([key, ts]);
       if (DEDUP_CACHE === null) DEDUP_CACHE = {};
-      DEDUP_CACHE[String(key)] = true;
+      registerDedupKeyLocal(DEDUP_CACHE, key);
       return;
     }
   } catch (e) {
@@ -867,7 +1011,7 @@ function markDedupKey(key) {
   // Do NOT write dedup keys into PropertiesService (limited storage). Ensure in-memory cache is updated so
   // within this execution we avoid reprocessing the same key even if sheet append failed.
   if (DEDUP_CACHE === null) DEDUP_CACHE = {};
-  DEDUP_CACHE[String(key)] = true;
+  registerDedupKeyLocal(DEDUP_CACHE, key);
 }
 
 /**
@@ -923,6 +1067,33 @@ function migrateDedupPropertiesToSheet() {
   return migrated;
 }
 
+/**
+ * runMigrateDedupSilent()
+ * Convenience wrapper to invoke the migration helper without UI dependencies.
+ * Logs the outcome using the standard logging pipeline for observability.
+ */
+function runMigrateDedupSilent() {
+  var migrated = 0;
+  var error = null;
+  try {
+    migrated = migrateDedupPropertiesToSheet();
+  } catch (e) {
+    error = e;
+  }
+  try {
+    var cfg = getConfig();
+    var meta = createLogMeta(cfg, null, 'utility');
+    var sheetCtx = ensureSheet();
+    var tz = Session && typeof Session.getScriptTimeZone === 'function' ? Session.getScriptTimeZone() : 'UTC';
+    var note = error ? ('migrate-dedup error: ' + String(error)) : ('migrate-dedup migrated=' + String(migrated));
+    appendLog(sheetCtx.sheet, [makeLogRow(tz, '', '', 0, -1, -1, '', null, 0, note, 0, meta)]);
+  } catch (logErr) {
+    // swallow logging issues; migration already executed
+  }
+  if (error) throw error;
+  return migrated;
+}
+
 function getCursorPage() {
   var props = PropertiesService.getScriptProperties();
   var v = props.getProperty('LAST_SEARCH_CURSOR');
@@ -960,9 +1131,73 @@ function ensureScheduledTriggers(cfg) {
   props.setProperty(key, signature);
 }
 
-function makeLogRow(tz, repo, filePath, sizeBytes, chunkIdx, chunkTotal, pointId, httpStatus, upserted, err, elapsedMs) {
+function cloneLogMeta(meta) {
+  var out = {};
+  if (!meta) return out;
+  for (var key in meta) {
+    if (Object.prototype.hasOwnProperty.call(meta, key)) {
+      out[key] = meta[key];
+    }
+  }
+  return out;
+}
+
+function extendLogMeta(baseMeta, extra) {
+  var merged = cloneLogMeta(baseMeta);
+  if (extra) {
+    for (var key in extra) {
+      if (Object.prototype.hasOwnProperty.call(extra, key)) {
+        merged[key] = extra[key];
+      }
+    }
+  }
+  return merged;
+}
+
+function createLogMeta(cfg, vectorCfg, runMode) {
+  var meta = {
+    collectionName: (cfg && cfg.QDRANT_COLLECTION) ? String(cfg.QDRANT_COLLECTION) : '',
+    qdrantUrl: (cfg && cfg.QDRANT_URL) ? String(cfg.QDRANT_URL) : '',
+    vectorName: '',
+    vectorSize: '',
+    runMode: runMode || ''
+  };
+  updateLogMetaWithVector(meta, vectorCfg);
+  return meta;
+}
+
+function updateLogMetaWithVector(meta, vectorCfg) {
+  if (!meta) return;
+  if (!vectorCfg) {
+    if (meta.vectorName === undefined) meta.vectorName = '';
+    if (meta.vectorSize === undefined) meta.vectorSize = '';
+    return;
+  }
+  if (vectorCfg.useNamed && vectorCfg.name) {
+    meta.vectorName = String(vectorCfg.name);
+  } else if (vectorCfg.useNamed === false) {
+    meta.vectorName = '(unnamed)';
+  } else if (!meta.vectorName) {
+    meta.vectorName = '';
+  }
+  if (typeof vectorCfg.size === 'number' && !isNaN(vectorCfg.size)) {
+    meta.vectorSize = vectorCfg.size;
+  } else if (meta.vectorSize === undefined) {
+    meta.vectorSize = '';
+  }
+}
+
+function makeLogRow(tz, repo, filePath, sizeBytes, chunkIdx, chunkTotal, pointId, httpStatus, upserted, err, elapsedMs, meta) {
   var ts = formatIsoLocal(new Date(), tz);
   var chunkField = (chunkIdx >= 0 && chunkTotal >= 0) ? (String(chunkIdx) + '/' + String(chunkTotal)) : '';
+  meta = meta || {};
+  var dedupKeyVal = meta.dedupKey || '';
+  var dedupTsVal = meta.dedupTs || '';
+  var collectionName = meta.collectionName || '';
+  var qdrantUrl = meta.qdrantUrl || '';
+  var vectorName = meta.vectorName || '';
+  var vectorSize = (meta.vectorSize !== undefined && meta.vectorSize !== null) ? meta.vectorSize : '';
+  var runMode = meta.runMode || '';
   return [
     ts,
     repo || '',
@@ -973,7 +1208,14 @@ function makeLogRow(tz, repo, filePath, sizeBytes, chunkIdx, chunkTotal, pointId
     httpStatus != null ? httpStatus : '',
     upserted != null ? upserted : '',
     err || '',
-    elapsedMs || 0
+    elapsedMs || 0,
+    dedupKeyVal,
+    dedupTsVal,
+    collectionName,
+    qdrantUrl,
+    vectorName,
+    vectorSize,
+    runMode
   ];
 }
 

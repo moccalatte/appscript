@@ -7,7 +7,7 @@
 
 ## 2. Sasaran Utama
 1. Mengirim file `.py`, `.js`, `.ts`, `.go` dari repo populer secara bertahap dan stabil.
-2. Dedup berbasis key `repo_fullname@blob_sha:path` (sheet utama: `awesome_dedup`).
+2. Dedup berbasis key `[collection=<nama>]::repo_fullname@blob_sha:path` (sheet utama: `awesome_dedup`).
 3. Logging detail per chunk dan event dedup ke sheet `logs`.
 4. Menjaga penggunaan kuota Apps Script dan GitHub API tetap aman.
 
@@ -16,7 +16,7 @@
 - **Non-Scope:** Embedding aktual (hanya placeholder vector), crawling seluruh repo, repo privat.
 
 ## 4. Konfigurasi & Lingkungan
-- **Qdrant:** URL, API key, dan nama koleksi dikonfigurasi via Script Properties.
+- **Qdrant:** URL, API key, dan nama koleksi dikonfigurasi via Script Properties (boleh memakai placeholder antar properti, misal `QDRANT_COLLECTION={{COLL_NAME}}`).
 - **GitHub:** Personal Access Token (PAT) read-only untuk repo publik.
 - **Spreadsheet:** `QdrantFeedLogs` untuk log (`logs`) dan dedup (`awesome_dedup`).
 - **Zona waktu:** Default `Asia/Jakarta`.
@@ -44,11 +44,11 @@
 
 ## 9. Upsert & Dedup
 - Upsert per file dalam irisan ≤ 50 points.
-- Dedup key hanya ditulis ke sheet setelah upsert sukses.
-- Sheet `awesome_dedup` sebagai sumber utama dedup.
+- Dedup key hanya ditulis ke sheet setelah upsert sukses dan selalu memuat nama koleksi untuk menghindari tabrakan antar koleksi.
+- Sheet `awesome_dedup` sebagai sumber utama dedup dan memuat format kunci baru sekaligus kompatibel dengan format lama.
 
 ## 10. Logging & Observability
-- Sheet `logs`: granular per chunk, event dedup, error, summary run.
+- Sheet `logs`: granular per chunk, event dedup, error, summary run (kolom utama: `timestamp`, `repo`, `file_path`, `size_bytes`, `chunk_idx/total`, `point_id`, `qdrant_http_status`, `qdrant_result_points_upserted`, `error_message`, `elapsed_ms`, `dedup_key`, `dedup_ts`, `collection_name`, `qdrant_url`, `vector_name`, `vector_size`, `run_mode`).
 - Sheet `awesome_dedup`: kunci dedup dan timestamp.
 - Sheet `awesome_repo_history`: status terakhir setiap repo (processed, no-eligible-files, dedup-only, errors, skip-history) beserta commit SHA & timestamp.
 
@@ -65,6 +65,7 @@
 | `QDRANT_API_KEY`           | Wajib                                             |
 | `QDRANT_URL`               | Wajib, URL Qdrant                                 |
 | `QDRANT_COLLECTION`        | Wajib, nama koleksi Qdrant                        |
+| `USE_AWESOME_DISCOVERY`    | Default false, aktifkan discovery README          |
 | `AWESOME_MAX_REPOS_PER_RUN`| Default 5                                         |
 | `AWESOME_MAX_FILES_PER_REPO`| Default 4                                        |
 | `MAX_FILE_SIZE_BYTES`      | Default 65536                                     |
@@ -79,6 +80,7 @@
 | `AWESOME_SKIP_AWESOME_NAMED`| Default true, skip repo bernama `awesome-*`      |
 | `AWESOME_HISTORY_SHEET_NAME`| Default `awesome_repo_history`                   |
 | `AWESOME_HISTORY_EXPIRY_DAYS`| Default 30, TTL riwayat sebelum repo di-scan ulang |
+| `COLL_NAME` (atau variabel lain) | Opsional, dapat dipakai sebagai placeholder untuk properti lain |
 
 ## 13. Acceptance Criteria
 1. Trigger berjalan otomatis/manual sesuai konfigurasi, tanpa konflik lock.
@@ -91,6 +93,7 @@
 - Mulai dengan run kecil (`AWESOME_MAX_REPOS_PER_RUN=2`, `AWESOME_MAX_FILES_PER_REPO=2`).
 - Aktifkan `VERBOSE_LOGGING` untuk debugging discovery.
 - Simpan dedup di sheet, gunakan logs untuk observability.
+- Jalankan `runMigrateDedupSilent()` apabila masih ada kunci `DEDUP_` lama di Script Properties agar format kunci baru konsisten.
 - Untuk pengembangan: integrasi embedding nyata, monitoring sheet, migrasi cache dedup.
 
 ## 15. Referensi
