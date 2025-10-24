@@ -1,0 +1,94 @@
+# 🍌 Ba-banana Radars - Git Ignore
+# File yang tidak perlu di-commit ke repository
+
+# Logs dan temp files
+logs/
+*.log
+*.tmp
+*.temp
+
+# OS-specific
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE & Editor
+.vscode/
+.idea/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+
+# Google Apps Script (jika lokal development)
+.clasp.json
+clasp_cache/
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+secrets.json
+script_properties.json
+
+# Dependencies (jika ada Node.js integration)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python (jika ada Python tools)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Build & Distribution
+dist/
+build/
+*.zip
+*.tar.gz
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Certificates & Keys
+*.pem
+*.key
+*.crt
+*.p8
+
+# IDE generated
+.classpath
+.project
+.pydevproject
+.settings/
+*.iml
+
+# Archive files (backup sebelum upload)
+*.bak
+*.backup
+*.old
+*.archive
+
+# Spreadsheet exports (besar, jangan commit)
+*.xlsx
+*.xls
+*.csv
+export_*.json
+
+# Testing artifacts
+test_results/
+coverage/
+.nyc_output/
+
+# Misc
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+*.orig

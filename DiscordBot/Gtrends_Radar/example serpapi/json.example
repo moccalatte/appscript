@@ -1,0 +1,75 @@
+{
+  ...
+  "trending_searches": [
+    {
+      "query": "ps6",
+      "start_timestamp": 1750349400,
+      "active": true,
+      "search_volume": 20000,
+      "increase_percentage": 1000,
+      "categories": [
+        {
+          "id": 6,
+          "name": "Games"
+        },
+        {
+          "id": 18,
+          "name": "Technology"
+        }
+      ],
+      "serpapi_google_trends_link": "https://serpapi.com/search.json?data_type=TIMESERIES&date=now+1-d&engine=google_trends&geo=BR&hl=en&q=ps6&tz=420",
+      "news_page_token": "fq1NZnica1xTlFpYmlpcEp-SWJI4ZfK5R2G6KotS8xaFBk8-9-TP4_kw9qM8WQsY-6nnZWcIGwD4yCAY",
+      "serpapi_news_link": "https://serpapi.com/search.json?engine=google_trends_news&page_token=fq1NZnica1xTlFpYmlpcEp-SWJI4ZfK5R2G6KotS8xaFBk8-9-TP4_kw9qM8WQsY-6nnZWcIGwD4yCAY"
+    },
+    ...
+    {
+      "query": "mega sena concurso 2878",
+      "start_timestamp": 1750408200,
+      "active": true,
+      "search_volume": 5000,
+      "increase_percentage": 400,
+      "categories": [
+        {
+          "id": 6,
+          "name": "Games"
+        }
+      ],
+      "trend_breakdown": [
+        "resultado mega sena 2878",
+        "sorteio mega sena concurso 2878",
+        "sorteio mega sena",
+        "mega sena 2878 sorteio",
+        "resultado da mega sena 2878"
+      ],
+      "serpapi_google_trends_link": "https://serpapi.com/search.json?data_type=TIMESERIES&date=now+1-d&engine=google_trends&geo=BR&hl=en&q=mega+sena+concurso+2878&tz=420",
+      "news_page_token": "gxtUAXica1xTlFpYmlpcEp-SWJI4dfK5JzytpYsKShY5BUHZqcVg9tPfroww8Wc8NVJwtvjNcxA2AH1uJXA",
+      "serpapi_news_link": "https://serpapi.com/search.json?engine=google_trends_news&page_token=gxtUAXica1xTlFpYmlpcEp-SWJI4dfK5JzytpYsKShY5BUHZqcVg9tPfroww8Wc8NVJwtvjNcxA2AH1uJXA"
+    },
+    ...
+    {
+      "query": "bet365",
+      "start_timestamp": 1750384200,
+      "end_timestamp": 1750387800,
+      "active": false,
+      "search_volume": 10000,
+      "increase_percentage": 100,
+      "categories": [
+        {
+          "id": 17,
+          "name": "Sports"
+        },
+        {
+          "id": 6,
+          "name": "Games"
+        }
+      ],
+      "trend_breakdown": [
+        "bet 365"
+      ],
+      "serpapi_google_trends_link": "https://serpapi.com/search.json?data_type=TIMESERIES&date=now+1-d&engine=google_trends&geo=BR&hl=en&q=bet365&tz=420",
+      "news_page_token": "GamYFXica1xTlFpYmlpcEp-SWJI4c_K5Z2ZbLRel5i1yCgKypeMS4GzjLnYY-8n3md1wcX7lOTD244AVwTD2w4y_9jD202WBR-HsxwtLIGwABJA_jA",
+      "serpapi_news_link": "https://serpapi.com/search.json?engine=google_trends_news&page_token=GamYFXica1xTlFpYmlpcEp-SWJI4c_K5Z2ZbLRel5i1yCgKypeMS4GzjLnYY-8n3md1wcX7lOTD244AVwTD2w4y_9jD202WBR-HsxwtLIGwABJA_jA"
+    },
+    ...
+  ]
+}
