@@ -240,19 +240,27 @@ function generateCoverLetter(jobDetails, profile) {
     validateInput(JSON.stringify(jobDetails));
     validateInput(JSON.stringify(profile));
 
-    let basePrompt = `Buat cover letter personal untuk lowongan:
-    - Posisi: ${jobDetails.role || 'N/A'}
-    - Perusahaan: ${jobDetails.company || 'N/A'}
-    - Requirements: ${jobDetails.requirements || 'N/A'}
-    - Description: ${jobDetails.description || 'N/A'}
+    let basePrompt = `Sebagai seorang job seeker specialist, buatkan cover letter yang profesional, ringkas, dan persuasif untuk lowongan berikut:
+- Posisi: ${jobDetails.role || 'N/A'}
+- Perusahaan: ${jobDetails.company || 'N/A'}
+- Kualifikasi Kunci: ${jobDetails.requirements || 'N/A'}
 
-    Profil kandidat:
-    - Nama: ${profile.name || 'Kandidat'}
-    - Email: ${profile.email || 'N/A'}
-    - Skills: ${profile.skills || 'N/A'}
-    - Pengalaman: ${profile.experiences || profile.experience || 'N/A'}
+Profil kandidat:
+- Nama: ${profile.name || 'Kandidat'}
+- Keahlian Utama: ${profile.skills || 'N/A'}
+- Pengalaman Relevan: ${profile.experiences || profile.experience || 'N/A'}
 
-    Instruksi: Gunakan bahasa Indonesia, profesional tapi personal dan genuine. Ringkas (max 300 kata). Highlight key skills yang relevan. Akhiri dengan enthusiasm untuk bergabung dan siap interview.`;
+Gunakan Bahasa Indonesia yang formal namun terdengar natural (gaya semi-formal).
+
+Struktur & Aturan:
+1.  **Paragraf 1 (Pembuka):** Sebutkan posisi yang dilamar dan dari mana Anda mengetahui informasi lowongan. Tunjukkan antusiasme yang tulus terhadap perusahaan (sebutkan sesuatu yang spesifik tentang perusahaan jika memungkinkan, misal: "Saya mengagumi [nama perusahaan] atas inovasinya di bidang...").
+2.  **Paragraf 2 (Isi):** JANGAN hanya mengulang CV. Pilih 1-2 kualifikasi paling penting dari lowongan dan ceritakan secara singkat bagaimana pengalaman atau keahlian Anda ("${profile.skills}" atau "${profile.experiences}") cocok dengan kebutuhan tersebut. Berikan contoh nyata jika memungkinkan.
+3.  **Paragraf 3 (Penutup):** Ucapkan terima kasih dan sampaikan harapan untuk diskusi lebih lanjut. Sertakan call to action yang sopan.
+
+PENTING:
+- **Hindari frasa klise** seperti "Saya adalah seorang yang pekerja keras dan termotivasi."
+- **Terdengar seperti manusia**, bukan robot atau template.
+- **Maksimal 250 kata.**`;
 
     // Tambahkan custom prompt jika ada
     if (profile.ai_prompt && profile.ai_prompt.trim()) {
