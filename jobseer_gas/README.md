@@ -14,6 +14,7 @@ JobSeer GAS adalah asisten otomatis berbasis Google Apps Script untuk melamar pe
 - **Upload Screenshot/Teks Lowongan**: JPG/PNG (max 2MB) atau paste teks.
 - **AI Extraction**: Gemini untuk OCR, OpenRouter untuk parsing detail.
 - **Auto Cover Letter**: Personalized berdasarkan profil dan job requirements.
+- **Dual Language Support**: Buat cover letter dalam Bahasa Indonesia atau Inggris.
 - **Dual Mode**: Nabung Lamaran (save for batch) & Kirim Sekarang (langsung email).
 - **Profile Management**: Nama, email, CV URL, skills, pengalaman, custom AI prompt.
 - **Bulk Preview & Send**: Kirim banyak lamaran sekaligus.
@@ -133,6 +134,7 @@ JobSeer GAS adalah asisten otomatis berbasis Google Apps Script untuk melamar pe
   - Upload screenshot lowongan (JPG/PNG, max 2MB) atau paste teks.
   - Untuk batch screenshot gunakan card “🗂️ Upload Batch Screenshot” (file <=5MB, upload ke Drive otomatis).
   - Pilih mode: "📦 Nabung Lamaran" (save) atau "📧 Kirim Sekarang" (langsung email).
+  - Pilih bahasa cover letter: "🇮🇩 Indonesia" atau "🇬🇧 English".
   - Klik "Proses".
 - Cek Google Sheets "JobSeer Data":
   - Sheet `lowongan_raw` → teks hasil ekstraksi.
