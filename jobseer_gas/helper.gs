@@ -235,12 +235,36 @@ function checkDuplicate(candidateEmail, company, role, hrEmail) {
 
 
 // Fungsi generate cover letter dengan custom prompt support
-function generateCoverLetter(jobDetails, profile) {
+function generateCoverLetter(jobDetails, profile, language = 'id') {
   try {
     validateInput(JSON.stringify(jobDetails));
     validateInput(JSON.stringify(profile));
 
-    let basePrompt = `Sebagai seorang job seeker specialist, buatkan cover letter yang profesional, ringkas, dan persuasif untuk lowongan berikut:
+    let basePrompt;
+    if (language === 'en') {
+      basePrompt = `As a job seeker specialist, create a professional, concise, and persuasive cover letter for the following opening:
+- Position: ${jobDetails.role || 'N/A'}
+- Company: ${jobDetails.company || 'N/A'}
+- Key Qualifications: ${jobDetails.requirements || 'N/A'}
+
+Candidate Profile:
+- Name: ${profile.name || 'Candidate'}
+- Key Skills: ${profile.skills || 'N/A'}
+- Relevant Experience: ${profile.experiences || profile.experience || 'N/A'}
+
+Use formal yet natural-sounding English (semi-formal style).
+
+Structure & Rules:
+1.  **Paragraph 1 (Opener):** State the position you're applying for and where you found it. Express genuine enthusiasm for the company (mention something specific if possible, e.g., "I admire [Company Name]'s innovation in...").
+2.  **Paragraph 2 (Body):** DO NOT just repeat the CV. Pick 1-2 of the most important qualifications from the job description and briefly explain how your experience or skills ("${profile.skills}" or "${profile.experiences}") align with those needs. Provide a real example if possible.
+3.  **Paragraph 3 (Closer):** Express thanks and your desire for further discussion. Include a polite call to action.
+
+IMPORTANT:
+- **Avoid clichés** like "I am a hard-working and motivated individual."
+- **Sound human**, not like a robot or a template.
+- **Maximum 250 words.**`;
+    } else {
+      basePrompt = `Sebagai seorang job seeker specialist, buatkan cover letter yang profesional, ringkas, dan persuasif untuk lowongan berikut:
 - Posisi: ${jobDetails.role || 'N/A'}
 - Perusahaan: ${jobDetails.company || 'N/A'}
 - Kualifikasi Kunci: ${jobDetails.requirements || 'N/A'}
@@ -261,6 +285,7 @@ PENTING:
 - **Hindari frasa klise** seperti "Saya adalah seorang yang pekerja keras dan termotivasi."
 - **Terdengar seperti manusia**, bukan robot atau template.
 - **Maksimal 250 kata.**`;
+    }
 
     // Tambahkan custom prompt jika ada
     if (profile.ai_prompt && profile.ai_prompt.trim()) {

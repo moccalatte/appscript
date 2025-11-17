@@ -514,7 +514,7 @@ function processParsingQueueStep() {
 
 // ==================== PROCESS IMAGE ====================
 
-function processImage(fileData, mode, manualEmail) {
+function processImage(fileData, mode, manualEmail, language) {
   try {
     checkQuota();
     const blob = normalizeImageInput(fileData);
@@ -553,7 +553,8 @@ function processImage(fileData, mode, manualEmail) {
       mode === 'nabung' ? 'nabung' : 'ready',
       manualEmail || '',
       parsed.custom_subject || '',
-      ''
+      '',
+      language || 'id'
     ]);
 
     // Mode nabung: hanya simpan, jangan kirim
@@ -572,7 +573,7 @@ function processImage(fileData, mode, manualEmail) {
 
 // ==================== PROCESS TEXT ====================
 
-function parseText(text, mode, manualEmail) {
+function parseText(text, mode, manualEmail, language) {
   try {
     checkQuota();
     validateInput(text);
@@ -608,7 +609,8 @@ function parseText(text, mode, manualEmail) {
       mode === 'nabung' ? 'nabung' : 'ready',
       manualEmail || '',
       parsed.custom_subject || '',
-      ''
+      '',
+      language || 'id'
     ]);
 
     // Mode nabung: hanya simpan, jangan kirim
@@ -748,7 +750,7 @@ function sendBulk() {
          }
 
         // Generate cover letter jika belum ada dengan profile
-        const cover = item.cover_letter || generateCoverLetter(item, profile);
+        const cover = item.cover_letter || generateCoverLetter(item, profile, item.language_mode);
 
         // Tentukan subject email
         const emailSubject = buildEmailSubject(item);
