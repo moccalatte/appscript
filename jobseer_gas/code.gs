@@ -899,3 +899,56 @@ function getDefaultProfile() {
     prompt: 'Buat cover letter profesional yang ringkas dan personal.'
   };
 }
+
+// ==================== TRIGGER MANAGEMENT ====================
+
+/**
+ * Sets up the time-driven triggers for sending bulk emails.
+ * This function must be run manually from the script editor once to activate the triggers.
+ * It will delete any existing triggers for the 'sendBulk' function to prevent duplicates.
+ */
+function setupTriggers() {
+  // Delete existing triggers for the 'sendBulk' function to avoid duplicates.
+  const existingTriggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < existingTriggers.length; i++) {
+    if (existingTriggers[i].getHandlerFunction() === 'sendBulk') {
+      ScriptApp.deleteTrigger(existingTriggers[i]);
+    }
+  }
+
+  // Create triggers for 9 AM, 1 PM, and 3 PM WIB (Asia/Jakarta).
+  ScriptApp.newTrigger('sendBulk')
+      .timeBased()
+      .atHour(9)
+      .everyDays(1)
+      .inTimezone('Asia/Jakarta')
+      .create();
+
+  ScriptApp.newTrigger('sendBulk')
+      .timeBased()
+      .atHour(13)
+      .everyDays(1)
+      .inTimezone('Asia/Jakarta')
+      .create();
+
+  ScriptApp.newTrigger('sendBulk')
+      .timeBased()
+      .atHour(15)
+      .everyDays(1)
+      .inTimezone('Asia/Jakarta')
+      .create();
+
+  logInfo('Triggers for bulk sending have been set up for 09:00, 13:00, and 15:00 WIB.');
+}
+
+/**
+ * Deletes all project triggers.
+ * This function can be run manually to stop all automated processes.
+ */
+function deleteTriggers() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    ScriptApp.deleteTrigger(triggers[i]);
+  }
+  logInfo('All project triggers have been deleted.');
+}
