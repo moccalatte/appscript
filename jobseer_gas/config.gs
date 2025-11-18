@@ -14,7 +14,7 @@ const SHEET_NAMES = {
 // Header untuk setiap sheet
 const SHEET_HEADERS = {
   RAW: ['timestamp', 'submitted_by', 'content', 'status', 'file_id', 'file_name', 'source_type', 'processed_at', 'notes'],
-  PARSED: ['timestamp', 'source_raw_timestamp', 'role', 'company', 'email', 'location', 'salary', 'requirements', 'description', 'status', 'email_manual', 'custom_subject', 'cover_letter', 'language_mode'],
+  PARSED: ['timestamp', 'source_raw_timestamp', 'role', 'company', 'email', 'location', 'salary', 'requirements', 'description', 'status', 'email_manual', 'subject_template', 'cover_letter', 'language_mode'],
   EMAILS: ['timestamp', 'candidate_email', 'recipient_email', 'job_role', 'job_company', 'subject', 'body_preview', 'status', 'message_id', 'error_message'],
   PROFILES: ['user_id', 'name', 'email', 'cv_path', 'ai_prompt', 'skills', 'experiences', 'notes', 'ai_model', 'warned', 'banned', 'created_at', 'updated_at', 'cv_url', 'custom_prompt'],
   LOGS: ['timestamp', 'level', 'message', 'user_id', 'details']

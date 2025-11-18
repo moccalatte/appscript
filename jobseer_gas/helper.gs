@@ -490,14 +490,16 @@ Return JSON format:
   "salary": "salary range or null",
   "requirements": "key requirements or null",
   "description": "job description or null",
-  "custom_subject": "if 'subject:' or 'subjek:' found, extract value, else null"
+  "subject_template": "if 'subject:' or 'subjek:' format instruction found, return the template (e.g., '[NAMA]_[POSISI]'), else null"
 }
 
 Rules:
-- Email harus format valid (user@domain)
-- Untuk custom_subject: cari patterns 'subject:', 'subjek:', 'posisi:', 'lowongan:'
-- Jika tidak ada pattern, set ke null
-- Output HANYA JSON, tanpa markdown, tanpa triple backticks`;
+- Email harus format valid (user@domain).
+- Untuk subject_template:
+  - Cari instruksi format subject (e.g., "kirim dengan subject: NAMA_POSISI").
+  - Ganti placeholder dinamis dengan bracket (e.g., NAMA -> [NAMA], POSISI -> [POSISI], LOKASI -> [LOKASI], PERUSAHAAN -> [PERUSAHAAN]).
+  - Jika tidak ada instruksi, set ke null.
+- Output HANYA JSON, tanpa markdown, tanpa triple backticks.`;
 
     const response = callOpenRouterAPI(prompt);
 
@@ -533,7 +535,7 @@ Rules:
       salary: null,
       requirements: null,
       description: null,
-      custom_subject: null
+      subject_template: null
     };
   }
 }

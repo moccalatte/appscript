@@ -155,7 +155,7 @@ function getBulkNabung() {
       salary: p.salary || 'N/A',
       requirements: p.requirements || '',
       description: p.description || '',
-      custom_subject: p.custom_subject || '',
+      subject_template: p.subject_template || '',
       cover_letter: p.cover_letter || ''
     }));
 
@@ -462,7 +462,7 @@ function processParsingQueueStep() {
       parsed.description || '',
       'nabung',
       '',
-      parsed.custom_subject || '',
+      parsed.subject_template || '',
       ''
     ]);
 
@@ -552,7 +552,7 @@ function processImage(fileData, mode, manualEmail, language) {
       parsed.description || '',
       mode === 'nabung' ? 'nabung' : 'ready',
       manualEmail || '',
-      parsed.custom_subject || '',
+      parsed.subject_template || '',
       '',
       language || 'id'
     ]);
@@ -608,7 +608,7 @@ function parseText(text, mode, manualEmail, language) {
       parsed.description || '',
       mode === 'nabung' ? 'nabung' : 'ready',
       manualEmail || '',
-      parsed.custom_subject || '',
+      parsed.subject_template || '',
       '',
       language || 'id'
     ]);
@@ -678,7 +678,7 @@ function processParsedData(parsed, timestamp, manualEmail, sourceText) {
     });
 
     // Tentukan subject email
-    const emailSubject = buildEmailSubject(parsed);
+    const emailSubject = buildEmailSubject(parsed, profile);
 
     // Kirim email dengan CV
     const sendResult = sendEmailWithAttachmentFromUrl(hrEmail, emailSubject, cover, profile.name);
@@ -753,7 +753,7 @@ function sendBulk() {
         const cover = item.cover_letter || generateCoverLetter(item, profile, item.language_mode);
 
         // Tentukan subject email
-        const emailSubject = buildEmailSubject(item);
+        const emailSubject = buildEmailSubject(item, profile);
 
         // Kirim email
         const sendResult = sendEmailWithAttachmentFromUrl(item.email, emailSubject, cover, profile.name);
@@ -822,21 +822,26 @@ function sendBulk() {
 
 // ==================== BUILD EMAIL SUBJECT ====================
 
-// Build email subject - gunakan custom_subject jika ada, atau generate default
-function buildEmailSubject(parsed) {
+// Build email subject from template or generate a best-practice default
+function buildEmailSubject(parsed, profile) {
   try {
-    // Prioritas: custom_subject > default format
-    if (parsed.custom_subject && parsed.custom_subject.trim()) {
-      return parsed.custom_subject.trim();
+    // Prioritas: Gunakan subject_template jika ada
+    if (parsed.subject_template && parsed.subject_template.trim()) {
+      let subject = parsed.subject_template;
+      // Ganti placeholder dengan data aktual
+      subject = subject.replace(/\[NAMA\]/gi, profile.name || 'Kandidat');
+      subject = subject.replace(/\[POSISI\]/gi, parsed.role || 'Posisi yang Dilamar');
+      subject = subject.replace(/\[PERUSAHAAN\]/gi, parsed.company || 'Perusahaan');
+      subject = subject.replace(/\[LOKASI\]/gi, parsed.location || 'Lokasi');
+      return subject;
     }
 
-    // Generate default subject
-    const role = parsed.role || 'Lamaran Kerja';
-    const company = parsed.company || 'Perusahaan';
-    return `Lamaran: ${role} - ${company}`;
+    // Generate default best-practice subject
+    const role = parsed.role || 'Posisi yang Dilamar';
+    return `${profile.name} - Lamaran Posisi ${role}`;
   } catch (e) {
     logError('Build email subject failed: ' + e.message);
-    return 'Lamaran Kerja';
+    return 'Lamaran Kerja'; // Fallback subject
   }
 }
 

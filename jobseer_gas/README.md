@@ -18,6 +18,7 @@ JobSeer GAS adalah asisten otomatis berbasis Google Apps Script untuk melamar pe
 - **Dual Mode**: Nabung Lamaran (save for batch) & Kirim Sekarang (langsung email).
 - **Profile Management**: Nama, email, CV URL, skills, pengalaman, custom AI prompt.
 - **Bulk Preview & Send**: Kirim banyak lamaran sekaligus.
+- **Auto Subject**: Otomatis deteksi dan pakai format subject email yang diminta lowongan.
 - **Status & Tracking**: Statistik real-time, audit trail di Google Sheets.
 - **Smart Email Validation**: Regex + MX record check, manual override jika gagal.
 - **UI Luminous Dashboard**: Tailwind + shadcn vibe, gradient blur, toast notification, dark mode toggle.
