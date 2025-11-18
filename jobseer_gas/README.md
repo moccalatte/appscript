@@ -26,6 +26,20 @@ JobSeer GAS adalah asisten otomatis berbasis Google Apps Script untuk melamar pe
 
 ---
 
+## ✨ Fitur Tambahan (Advanced)
+
+- **Otomatisasi Pengiriman**: Jadwalkan pengiriman lamaran yang tersimpan (`nabung`) secara otomatis pada jam-jam strategis (09:00, 13:00, 15:00 WIB) agar email kamu lebih cepat dilihat oleh rekruter.
+
+  - **Cara Aktivasi**:
+    1. Buka editor Google Apps Script.
+    2. Pilih fungsi `setupTriggers` dari dropdown.
+    3. Klik "Run".
+    4. Cek log eksekusi untuk memastikan trigger berhasil dibuat.
+
+  - **Cara Menonaktifkan**:
+    1. Pilih fungsi `deleteTriggers`.
+    2. Klik "Run" untuk menghapus semua jadwal otomatis.
+
 ## 📝 Prasyarat & Persiapan
 
 ### Wajib
