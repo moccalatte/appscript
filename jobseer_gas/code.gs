@@ -563,7 +563,7 @@ function processImage(fileData, mode, manualEmail, language) {
     }
 
     // Mode kirim: eksekusi penuh
-    return processParsedData(parsed, timestamp, manualEmail, extractedText);
+    return processParsedData(parsed, timestamp, manualEmail, extractedText, language);
 
   } catch (error) {
     logError('Process image failed: ' + error.message);
@@ -619,7 +619,7 @@ function parseText(text, mode, manualEmail, language) {
     }
 
     // Mode kirim: eksekusi penuh
-    return processParsedData(parsed, timestamp, manualEmail, text);
+    return processParsedData(parsed, timestamp, manualEmail, text, language);
 
   } catch (error) {
     logError('Parse text failed: ' + error.message);
@@ -630,7 +630,7 @@ function parseText(text, mode, manualEmail, language) {
 // ==================== PROCESS PARSED DATA ====================
 
 // Helper function untuk proses data yang sudah di-parse
-function processParsedData(parsed, timestamp, manualEmail, sourceText) {
+function processParsedData(parsed, timestamp, manualEmail, sourceText, language) {
   try {
     checkQuota();
 
@@ -664,10 +664,11 @@ function processParsedData(parsed, timestamp, manualEmail, sourceText) {
     }
 
     parsed.email = hrEmail;
+    parsed.language_mode = language; // <-- FIX: Assign language to parsed object
 
     // Generate cover letter with profile data
     const profile = getLocalProfile();
-    const cover = generateCoverLetter(parsed, profile);
+    const cover = generateCoverLetter(parsed, profile, language);
 
     // Update sheet dengan cover letter dan email_manual jika ada
     updateSheetRow(SHEET_NAMES.PARSED, row => isSameTimestamp(row.timestamp, timestamp), {
@@ -836,8 +837,12 @@ function buildEmailSubject(parsed, profile) {
       return subject;
     }
 
-    // Generate default best-practice subject
-    const role = parsed.role || 'Posisi yang Dilamar';
+    // Generate default best-practice subject based on language
+    const role = parsed.role || 'the Position';
+    if (parsed.language_mode === 'en') {
+      return `${profile.name} - Application for ${role} Position`;
+    }
+    // Default to Indonesian
     return `${profile.name} - Lamaran Posisi ${role}`;
   } catch (e) {
     logError('Build email subject failed: ' + e.message);
