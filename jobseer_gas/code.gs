@@ -17,9 +17,9 @@ function doPost(e) {
 
     switch (action) {
       case 'process_image':
-        return ContentService.createTextOutput(JSON.stringify(processImage(payload.file, payload.mode, payload.manualEmail))).setMimeType(ContentService.MimeType.JSON);
+        return ContentService.createTextOutput(JSON.stringify(processImage(payload.file, payload.mode, payload.manualEmail, payload.language))).setMimeType(ContentService.MimeType.JSON);
       case 'parse_text':
-        return ContentService.createTextOutput(JSON.stringify(parseText(payload.text, payload.mode, payload.manualEmail))).setMimeType(ContentService.MimeType.JSON);
+        return ContentService.createTextOutput(JSON.stringify(parseText(payload.text, payload.mode, payload.manualEmail, payload.language))).setMimeType(ContentService.MimeType.JSON);
       case 'send_bulk':
         return ContentService.createTextOutput(JSON.stringify(sendBulk())).setMimeType(ContentService.MimeType.JSON);
       case 'get_bulk_nabung':
@@ -652,7 +652,8 @@ function processParsedData(parsed, timestamp, manualEmail, sourceText, language)
         parsed: parsed,
         timestamp: timestamp instanceof Date ? timestamp.toISOString() : timestamp,
         reason: emailCheck.reason,
-        source: sourceText ? 'text' : 'image'
+        source: sourceText ? 'text' : 'image',
+        language: language
       };
     }
 

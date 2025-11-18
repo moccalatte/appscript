@@ -1,6 +1,6 @@
 // jobseer_gas/config.gs
 // Konstanta dan Konfigurasi untuk JobSeer GAS
-// Update: Tambah kolom custom_subject di PARSED sheet
+// Update: Ganti custom_subject dengan subject_template di PARSED sheet
 
 // Nama sheet di spreadsheet
 const SHEET_NAMES = {
